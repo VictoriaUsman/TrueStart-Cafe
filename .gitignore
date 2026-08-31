@@ -6,3 +6,4 @@ node_modules/
 *.json.key
 truestart-dashboard-*.json
 *-service-account*.json
+.superpowers/
