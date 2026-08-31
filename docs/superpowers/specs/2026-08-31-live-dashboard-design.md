@@ -32,6 +32,10 @@ No subscription/Recharge data exists in the Sheet yet — the Subscription & LTV
 
 The "campaigns" (Meta) tab has a "Campaign view / Action items" toggle: a collapsible per-campaign ad breakdown plus operational recommendations ("graduate this proven ad into the Proven campaign," "archive this paused campaign," "N creatives have a paused leftover copy in another campaign"). The first two recommendation types are derivable from data already covered by this spec (PROVEN-but-not-`in_proven` ads; a campaign with ~£0 current-window spend). The third — detecting a paused duplicate of the same ad running in another campaign — needs per-*ad* currently-delivering status, which the Sheet's Creatives tab doesn't carry (it's a 30-day aggregate per ad, not day-by-day; only campaign-level daily data is available). Per decision, this entire sub-feature is deferred (see Section 11) rather than built on an unreliable proxy.
 
+### 2.3 CAC monthly trend is not reproducible from current Sheet data
+
+The "New vs returning customers" tab has exactly one total pair (new/returning) for a single trailing window — no date column, no per-month breakdown. The current static file's CAC KPI caption ("£22 ... July, was £41 (May)") and its "Cost per new customer" monthly bar chart imply data this Sheet doesn't contain. Per decision: the CAC KPI card shows a single blended figure for the trailing window the Sheet actually covers (honest wording, no fabricated month name), and the monthly bar chart becomes a placeholder note explaining monthly data isn't available yet.
+
 ## 3. Architecture
 
 **Key discovery from reading the original file's embedded `<script>` in full:** most of the page is not actually static markup waiting to be reimplemented — a meaningful chunk of it is already live client-side JS, driven by a small number of injected data literals:
@@ -79,7 +83,7 @@ On each request: fetch all Sheet tabs (CSV) + live Shopify inventory in parallel
   - `in_proven` flag (separate from `status`): true only for ads physically placed in the `K-TS_UK_BOF-PROVEN` campaign. Dashboard caption "N in Proven campaign · M ready to move" = count of `in_proven=true` vs. `status=PROVEN & in_proven=false`.
 - **Angle / Persona / Product / Format:** parsed from `Ad name` using the naming convention `..._<Persona>_<Angle>_<Product>_<Format>[ V#]` (e.g. `BOF_ST_19_Upgrader_Price_Starter_Bags V2`). Any name that doesn't match falls back to `"Other"` for each field.
 - **Blended ROAS / MER** = Total Shopify sales ÷ (Meta spend + Google cost), for a given window.
-- **CAC** = (Meta spend + Google spend) ÷ new customers (from New-vs-returning tab), per month.
+- **CAC** = (Meta spend + Google spend) ÷ new customers (from New-vs-returning tab), for the same trailing window the New-vs-returning tab covers. **Note:** that tab holds only one total pair (new/returning) for a single trailing window, not a per-month breakdown, so CAC is shown as one blended figure for that window rather than a month-by-month trend (see 2.3).
 - **Stock "advertised" flag and low-stock threshold:** see Section 3 — reuses the original page's existing regex rule and `localStorage`-backed threshold input unchanged; not re-derived server-side.
 - **Daily blended ROAS series (`RS`/`LB`):** one value per calendar day covered by the Sheet's Shopify-daily-sales and Meta/Google-by-day tabs (from Feb 15 onward) = that day's Shopify total sales ÷ that day's (Meta spend + Google cost); `LB` is the matching `"Mon D"`-formatted date label for each day, in the same order.
 
@@ -122,5 +126,6 @@ Public, unlisted Vercel URL. No authentication layer. Relies on the URL not bein
 
 - Subscriber-level Recharge metrics (active subscribers, taster→subscribe rate, subscription LTV) — stays a placeholder note.
 - Meta campaigns tab's "Campaign view / Action items" sub-feature (collapsible per-campaign ad breakdown, graduate/archive/duplicate-cleanup recommendations) — stays a static "coming soon" note (see Section 2.2).
+- Monthly CAC trend / "Cost per new customer" bar chart — stays a static placeholder note; CAC KPI card shows one trailing-window figure instead (see Section 2.3).
 - Any authentication/access control beyond an unlisted URL.
 - Writing back to the Sheet or Shopify — this is read-only in both directions.
