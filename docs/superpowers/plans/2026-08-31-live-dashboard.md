@@ -2098,7 +2098,7 @@ function renderOverviewTab({ funnel, statusSpend }) {
       { key: 'roas', label: 'ROAS', numeric: true },
     ],
     rows: funnel.map((f) => ({
-      stage: `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${STAGE_COLOR[f.stage]};margin-right:7px"></span>${STAGE_LABEL[f.stage]}`,
+      stage: STAGE_LABEL[f.stage],
       spend: formatMoney(f.spend),
       share: formatPercent(f.share),
       ads: formatNumber(f.ads),
