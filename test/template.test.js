@@ -47,3 +47,12 @@ test('throws a descriptive error if a marker is missing from the template (templ
   const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
   assert.match(original, /<!--INJECT:KPI_TOP-->/, 'template.html must still contain the KPI_TOP marker for this test to be meaningful');
 });
+
+test('escapes "</script>" inside an injected literal so it cannot break out of the script tag', () => {
+  const html = injectDashboard(SECTIONS, {
+    ...LITERALS,
+    DATA: [{ name: '</script><script>alert(1)</script>' }],
+  });
+  assert.doesNotMatch(html, /<\/script><script>alert/);
+  assert.match(html, /\\u003c\/script>\\u003cscript>alert\(1\)\\u003c\/script>/);
+});
