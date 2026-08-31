@@ -14,6 +14,7 @@ const SECTIONS = {
   subscriptionTab: '<div>SUBS</div>',
   stockStatus: 'live · fetched now',
   cacChart: '<div class="note">CAC_CHART_PLACEHOLDER</div>',
+  windowNote: '📅 KPI cards above show the last 30 days (Aug 2 – Aug 31)...',
 };
 const LITERALS = {
   DATA: [{ name: 'Ad 1' }],
@@ -65,7 +66,7 @@ test('throws a descriptive error if a literal marker is missing from the templat
   const templateWithHtmlMarkersOnly =
     '<!--INJECT:KPI_TOP--><!--INJECT:GOOGLE_TAB--><!--INJECT:META_TAB--><!--INJECT:OVERVIEW_TAB-->' +
     '<!--INJECT:INSIGHTS_TAB--><!--INJECT:PACKPROD_TAB--><!--INJECT:COHORT_TABLE--><!--INJECT:SUBSCRIPTION_TAB-->' +
-    '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><script>no literal markers here</script>';
+    '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><!--INJECT:WINDOW_NOTE--><script>no literal markers here</script>';
   assert.throws(
     () => injectIntoHtml(templateWithHtmlMarkersOnly, SECTIONS, LITERALS),
     /Template marker \/\*INJECT:DATA\*\/ not found — has lib\/template\.html drifted\?/

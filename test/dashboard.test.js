@@ -145,3 +145,15 @@ test('degrades only the Stock section when the Shopify API call fails', async ()
     global.fetch = originalFetch;
   }
 });
+
+test('the KPI window note shows the real current 30-day windows, not a hardcoded date range', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchAllOk();
+  try {
+    const html = await buildDashboardHtml(ENV);
+    assert.doesNotMatch(html, /Jul 20 – Aug 18/); // the old hardcoded snapshot dates
+    assert.match(html, /KPI cards above show the <b>last 30 days \([A-Za-z]{3} \d{1,2} – [A-Za-z]{3} \d{1,2}\)<\/b>/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

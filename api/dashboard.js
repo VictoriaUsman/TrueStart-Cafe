@@ -1,7 +1,7 @@
 // api/dashboard.js
 const { fetchSheetTab } = require('../lib/sheets');
 const { fetchLowStockSnapshot } = require('../lib/shopify');
-const { toIsoDate } = require('../lib/dates');
+const { toIsoDate, formatShortLabel } = require('../lib/dates');
 const { buildCreativesData } = require('../lib/transform/creatives');
 const { buildDailyRoasSeries } = require('../lib/transform/daily-roas');
 const { sumInWindow, blendedMER, cac } = require('../lib/transform/kpi');
@@ -95,6 +95,7 @@ async function buildDashboardHtml(env) {
   const anchorDate =
     latestDate(shopifyDaily.rows, 'Day') || latestDate(metaDaily.rows, 'Day') || latestDate(googleDaily.rows, 'Day') || new Date().toISOString().slice(0, 10);
   const { start, end, prevStart, prevEnd } = windowBounds(anchorDate, 30);
+  const windowNote = `📅 KPI cards above show the <b>last 30 days (${formatShortLabel(start)} – ${formatShortLabel(end)})</b> vs the previous 30 days (${formatShortLabel(prevStart)} – ${formatShortLabel(prevEnd)}). Each tab below shows its own window — labelled in the heading.`;
 
   const shopifySales = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Total sales', start, end });
   const prevShopifySales = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Total sales', start: prevStart, end: prevEnd });
@@ -196,9 +197,9 @@ async function buildDashboardHtml(env) {
     '<div class="note" style="font-size:12.5px">Monthly CAC trend is not yet available — it needs a month-by-month ' +
     'new-customer breakdown this Sheet does not currently provide.</div>';
 
-  return injectDashboard(
+  const html = injectDashboard(
     {
-      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart,
+      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart, windowNote,
       // Plain text (not unavailableNote's <div>) because this is injected inside an inline <span> in
       // the template; phrasing still matches "{label} data is temporarily unavailable" for consistency
       // with the other sections' degraded-state copy.
@@ -206,6 +207,17 @@ async function buildDashboardHtml(env) {
     },
     { DATA: data, RS, LB, STK_SNAP: stock.snap }
   );
+
+  // The original static snapshot also hardcodes this same 30-day window's date range directly
+  // into several section headings and the page subtitle (outside any injected fragment) — e.g.
+  // "Google Ads performance — by campaign · last 30d (Jul 20 – Aug 18)". Rather than adding a
+  // marker at each of those spots, replace every literal occurrence of the two snapshot date
+  // ranges with today's real equivalents in one pass.
+  const currentWindowLabel = `${formatShortLabel(start)} – ${formatShortLabel(end)}`;
+  const prevWindowLabel = `${formatShortLabel(prevStart)} – ${formatShortLabel(prevEnd)}`;
+  return html
+    .split('Jul 20 – Aug 18').join(currentWindowLabel)
+    .split('Jun 20 – Jul 19').join(prevWindowLabel);
 }
 
 module.exports = { buildDashboardHtml };
