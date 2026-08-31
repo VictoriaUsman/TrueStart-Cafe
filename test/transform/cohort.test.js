@@ -36,3 +36,15 @@ test('an explicit M0 row overrides the 100% default', () => {
   const table = buildCohortTable([row('2025-08-08', 0, 1124, 1)]);
   assert.strictEqual(table[0].months[0], 1);
 });
+
+test('routes a DD-MM-YYYY-formatted Month through the shared date layer for correct label and sort order', () => {
+  // 08-09-2025 means 8 Sep 2025 in DD-MM-YYYY, not 8 Sept read as YYYY-MM-DD-style splitting.
+  const table = buildCohortTable([row('08-09-2025', 1, 100, 0.05), row('08-08-2025', 1, 200, 0.06)]);
+  assert.deepStrictEqual(table.map((r) => r.cohortLabel), ['Aug 2025', 'Sep 2025']);
+});
+
+test('skips a row with a blank/unparseable Month instead of mislabeling or throwing', () => {
+  const table = buildCohortTable([row('not-a-month', 1, 100, 0.05), row('2025-08-08', 1, 200, 0.06)]);
+  assert.strictEqual(table.length, 1);
+  assert.strictEqual(table[0].cohortLabel, 'Aug 2025');
+});
