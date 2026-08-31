@@ -1,8 +1,8 @@
 // api/sync-shopify.js
-const { fetchShopifySales, fetchNewVsReturning } = require('../lib/shopify-sales');
+const { fetchShopifySales, fetchNewVsReturning, fetchNewCustomersByMonth } = require('../lib/shopify-sales');
 const { getAccessToken } = require('../lib/google-sheets-auth');
 const { overwriteSheetRange } = require('../lib/google-sheets-writer');
-const { mapShopifySalesRows } = require('../lib/transform/shopify-sales-to-sheet-rows');
+const { mapShopifySalesRows, mapNewCustomersMonthlyRows } = require('../lib/transform/shopify-sales-to-sheet-rows');
 const { dateRange } = require('../lib/dates');
 
 const WINDOW_DAYS = 90;
@@ -27,6 +27,9 @@ async function syncShopify(env) {
     shopDomain: env.SHOPIFY_SHOP_DOMAIN, accessToken: env.SHOPIFY_ACCESS_TOKEN, dateFrom, dateTo,
   });
   const newVsReturningPromise = fetchNewVsReturning({
+    shopDomain: env.SHOPIFY_SHOP_DOMAIN, accessToken: env.SHOPIFY_ACCESS_TOKEN, dateFrom, dateTo,
+  });
+  const newCustomersMonthlyPromise = fetchNewCustomersByMonth({
     shopDomain: env.SHOPIFY_SHOP_DOMAIN, accessToken: env.SHOPIFY_ACCESS_TOKEN, dateFrom, dateTo,
   });
 
@@ -58,6 +61,20 @@ async function syncShopify(env) {
       } catch (err) {
         console.error('[sync-shopify] ShopifyNewVsReturning failed:', err);
         results.ShopifyNewVsReturning = { ok: false, error: err.message };
+      }
+    })(),
+    (async () => {
+      try {
+        const [accessToken, monthlyRows] = await Promise.all([tokenPromise, newCustomersMonthlyPromise]);
+        const sheetRows = mapNewCustomersMonthlyRows(monthlyRows);
+        await overwriteSheetRange({
+          accessToken, sheetId: env.GOOGLE_SHEET_ID, tabName: 'ShopifyNewCustomersMonthly',
+          rows: sheetRows, columnCount: 3,
+        });
+        results.ShopifyNewCustomersMonthly = { ok: true, rows: sheetRows.length };
+      } catch (err) {
+        console.error('[sync-shopify] ShopifyNewCustomersMonthly failed:', err);
+        results.ShopifyNewCustomersMonthly = { ok: false, error: err.message };
       }
     })(),
   ]);

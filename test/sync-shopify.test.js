@@ -28,12 +28,16 @@ function mockAll({ shopifyOk = true, sheetsOk = true } = {}) {
     }
     if (String(url).includes('myshopify.com')) {
       if (!shopifyOk) return { ok: false, status: 401, json: async () => ({}) };
+      const q = JSON.parse(opts.body).variables.q;
+      const rows = q.includes('TIMESERIES month')
+        ? [{ month: '2026-06-01', new_customers: '412', returning_customers: '201' }]
+        : q.includes('TIMESERIES day')
+        ? [{ day: '2026-08-25', orders: '136', gross_sales: '2783.78', discounts: '-268.78', returns: '-39.72', net_sales: '2475.28', shipping_charges: '292.89', duties: '0', additional_fees: '0', taxes: '93.56', total_sales: '2861.73' }]
+        : [{ new_customers: '6984', returning_customers: '3777' }];
       return {
         ok: true,
         status: 200,
-        json: async () => ({
-          data: { shopifyqlQuery: { tableData: { rows: [{ day: '2026-08-25', orders: '136', gross_sales: '2783.78', discounts: '-268.78', returns: '-39.72', net_sales: '2475.28', shipping_charges: '292.89', duties: '0', additional_fees: '0', taxes: '93.56', total_sales: '2861.73' }] }, parseErrors: [] } },
-        }),
+        json: async () => ({ data: { shopifyqlQuery: { tableData: { rows }, parseErrors: [] } } }),
       };
     }
     if (String(url).includes('sheets.googleapis.com')) {
@@ -52,6 +56,8 @@ test('syncShopify writes ShopifyTotals and reports rows written when everything 
     assert.strictEqual(result.ShopifyTotals.rows, 1);
     assert.strictEqual(result.ShopifyNewVsReturning.ok, true);
     assert.strictEqual(result.ShopifyNewVsReturning.rows, 2);
+    assert.strictEqual(result.ShopifyNewCustomersMonthly.ok, true);
+    assert.strictEqual(result.ShopifyNewCustomersMonthly.rows, 1);
   } finally {
     global.fetch = originalFetch;
   }
@@ -64,6 +70,8 @@ test('syncShopify reports failure without throwing when the Shopify fetch fails'
     const result = await syncShopify(ENV);
     assert.strictEqual(result.ShopifyTotals.ok, false);
     assert.match(result.ShopifyTotals.error, /Shopify API error \(401\)/);
+    assert.strictEqual(result.ShopifyNewCustomersMonthly.ok, false);
+    assert.match(result.ShopifyNewCustomersMonthly.error, /Shopify API error \(401\)/);
   } finally {
     global.fetch = originalFetch;
   }

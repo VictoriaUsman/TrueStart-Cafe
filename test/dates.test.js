@@ -1,7 +1,7 @@
 // test/dates.test.js
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { toIsoDate, formatShortLabel, isoDay, dateRange } = require('../lib/dates');
+const { toIsoDate, formatShortLabel, formatMonthLabel, isoDay, dateRange } = require('../lib/dates');
 
 test('toIsoDate passes through an already-ISO date', () => {
   assert.strictEqual(toIsoDate('2026-02-15'), '2026-02-15');
@@ -31,6 +31,12 @@ test('toIsoDate returns null for non-string input', () => {
 test('formatShortLabel renders "Mon D" style labels', () => {
   assert.strictEqual(formatShortLabel('2026-02-15'), 'Feb 15');
   assert.strictEqual(formatShortLabel('2026-08-18'), 'Aug 18');
+});
+
+test('formatMonthLabel renders the full month name for a YYYY-MM(-DD) date', () => {
+  assert.strictEqual(formatMonthLabel('2026-05-01'), 'May');
+  assert.strictEqual(formatMonthLabel('2026-06'), 'June');
+  assert.strictEqual(formatMonthLabel('2026-07-15'), 'July');
 });
 
 test('isoDay formats a Date object as YYYY-MM-DD in UTC', () => {

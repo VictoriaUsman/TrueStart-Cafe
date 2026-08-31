@@ -9,6 +9,12 @@ full design.
 1. Publish each of the 7 Sheet tabs to web as CSV (Google Sheet -> File
    -> Share -> Publish to web -> select tab -> CSV), and copy each
    resulting URL into the matching `SHEET_CSV_URL_*` variable below.
+   Once `sync-shopify.js` has run at least once and created the
+   `ShopifyNewCustomersMonthly` tab (header row: `Month, New customers,
+   Returning customers`), publish that tab too and set
+   `SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY` — this powers the
+   Monthly CAC trend chart; until it's set, that chart shows a "data
+   unavailable" note.
 2. Create a Shopify custom app (Settings -> Apps -> Develop apps) with
    `read_inventory` + `read_products` scopes and generate an Admin API
    access token.

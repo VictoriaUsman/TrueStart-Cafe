@@ -1,7 +1,7 @@
 // test/transform/shopify-sales-to-sheet-rows.test.js
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { mapShopifySalesRows } = require('../../lib/transform/shopify-sales-to-sheet-rows');
+const { mapShopifySalesRows, mapNewCustomersMonthlyRows } = require('../../lib/transform/shopify-sales-to-sheet-rows');
 
 test('maps a full ShopifyQL sales row to the ShopifyTotals column order', () => {
   const rows = mapShopifySalesRows([{
@@ -27,4 +27,20 @@ test('coerces string-typed numeric fields (all ShopifyQL values arrive as string
 test('defaults missing numeric fields to 0 and missing day to empty string', () => {
   const rows = mapShopifySalesRows([{ orders: '5', gross_sales: '100' }]);
   assert.deepStrictEqual(rows[0], ['', 5, 100, 0, 0, 0, 0, 0, 0, 0, 0]);
+});
+
+test('maps a full ShopifyQL monthly new/returning row to the ShopifyNewCustomersMonthly column order', () => {
+  const rows = mapNewCustomersMonthlyRows([
+    { month: '2026-06-01', new_customers: '412', returning_customers: '201' },
+    { month: '2026-07-01', new_customers: '389', returning_customers: '255' },
+  ]);
+  assert.deepStrictEqual(rows, [
+    ['2026-06-01', 412, 201],
+    ['2026-07-01', 389, 255],
+  ]);
+});
+
+test('mapNewCustomersMonthlyRows defaults missing numeric fields to 0 and missing month to empty string', () => {
+  const rows = mapNewCustomersMonthlyRows([{ new_customers: '10' }]);
+  assert.deepStrictEqual(rows[0], ['', 10, 0]);
 });

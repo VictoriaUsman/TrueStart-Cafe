@@ -1,7 +1,7 @@
 // test/shopify-sales.test.js
 const { test, mock } = require('node:test');
 const assert = require('node:assert');
-const { fetchShopifySales, fetchNewVsReturning } = require('../lib/shopify-sales');
+const { fetchShopifySales, fetchNewVsReturning, fetchNewCustomersByMonth } = require('../lib/shopify-sales');
 
 function fakeShopifyQlResponse(rows, parseErrors = []) {
   return {
@@ -98,6 +98,45 @@ test('fetchNewVsReturning returns zeros when there is no data in range', async (
   try {
     const result = await fetchNewVsReturning({ shopDomain: 'test.myshopify.com', accessToken: 'tok', dateFrom: '2026-06-03', dateTo: '2026-08-30' });
     assert.deepStrictEqual(result, { newCustomers: 0, returningCustomers: 0 });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('fetchNewCustomersByMonth sends a TIMESERIES month query and returns the rows as-is', async () => {
+  const originalFetch = global.fetch;
+  let capturedBody;
+  global.fetch = mock.fn(async (url, opts) => {
+    capturedBody = JSON.parse(opts.body);
+    return fakeShopifyQlResponse([
+      { month: '2026-06-01', new_customers: '412', returning_customers: '201' },
+      { month: '2026-07-01', new_customers: '389', returning_customers: '255' },
+    ]);
+  });
+  try {
+    const rows = await fetchNewCustomersByMonth({
+      shopDomain: 'test.myshopify.com', accessToken: 'tok', dateFrom: '2026-06-03', dateTo: '2026-08-30',
+    });
+    assert.deepStrictEqual(rows, [
+      { month: '2026-06-01', new_customers: '412', returning_customers: '201' },
+      { month: '2026-07-01', new_customers: '389', returning_customers: '255' },
+    ]);
+    assert.match(capturedBody.variables.q, /FROM sales/);
+    assert.match(capturedBody.variables.q, /SHOW new_customers, returning_customers/);
+    assert.match(capturedBody.variables.q, /TIMESERIES month/);
+    assert.match(capturedBody.variables.q, /SINCE 2026-06-03 UNTIL 2026-08-30/);
+    assert.match(capturedBody.variables.q, /ORDER BY month ASC/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('fetchNewCustomersByMonth returns an empty array when there is no data in range', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async () => fakeShopifyQlResponse(null));
+  try {
+    const rows = await fetchNewCustomersByMonth({ shopDomain: 'test.myshopify.com', accessToken: 'tok', dateFrom: '2026-06-03', dateTo: '2026-08-30' });
+    assert.deepStrictEqual(rows, []);
   } finally {
     global.fetch = originalFetch;
   }
