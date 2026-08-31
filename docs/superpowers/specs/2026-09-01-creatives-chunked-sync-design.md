@@ -24,7 +24,11 @@ Per discussion, chunk the sync into 6 independent, cron-triggered pieces rather 
 
 ## 3. Chunking scheme
 
-6 chunks, each covering a non-overlapping 5-day slice of the rolling 30-day window, indexed 0 (most recent) through 5 (oldest):
+6 chunks, each covering a non-overlapping 5-day slice, indexed 0 (most recent) through 5 (oldest).
+
+**Amendment (post-implementation, final whole-branch review):** the scheme below was superseded during implementation. A relative "days ago from today" formula means the exact days a chunk covers shift by one every day — so a chunk that fails and retries a day later ends up covering a *different* window than it would have on time, causing chunks to double-count some days and drop others once staleness accumulates (and per §1, staleness is the normal case here, not the exception). The shipped implementation instead anchors each chunk to a fixed 5-day calendar block (computed from days-since-Unix-epoch): `currentBlock = floor(epochDay(yesterday) / 5)`, chunk N owns block `currentBlock - N`. A chunk's assigned block only advances once every 5 days, so a chunk that's 1-4 days late still targets the exact same block it would have on time — no drift, no overlap, no gap, regardless of which days actually succeed. One accepted side effect: chunk 0's block can extend 1-4 days past "yesterday" into dates that haven't happened yet (Windsor returns no data for those, harmless) — ruled preferable to the alternative (anchoring to the most recently *complete* block instead), which would leave the freshest 1-4 days uncovered by any chunk until their block completes, a real freshness regression against this feature's whole purpose. See `api/sync-creatives.js`'s `chunkDateRange` for the implementation and `test/sync-creatives.test.js` for the contiguity/drift-immunity tests this property depends on.
+
+The original (superseded) design, kept for context:
 
 | Chunk | Covers (days ago) |
 |---|---|
@@ -35,7 +39,7 @@ Per discussion, chunk the sync into 6 independent, cron-triggered pieces rather 
 | 4 | 21–25 |
 | 5 | 26–30 |
 
-`dateFrom = daysAgo(chunk*5 + 5)`, `dateTo = daysAgo(chunk*5 + 1)` (yesterday, not today — same reasoning as every other sync job: today is a partial day).
+`dateFrom = daysAgo(chunk*5 + 5)`, `dateTo = daysAgo(chunk*5 + 1)` (yesterday, not today — same reasoning as every other sync job: today is a partial day). This relative formula is what introduced the drift bug above; the shipped code uses calendar-block anchoring instead.
 
 Each chunk is a separate Vercel Cron entry hitting the same handler with a `chunk` query param, staggered 5 minutes apart so all 6 don't hit Windsor in the same instant:
 
