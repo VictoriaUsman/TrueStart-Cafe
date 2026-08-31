@@ -2505,14 +2505,16 @@ Expected: FAIL with "Cannot find module '../../lib/render/subscription'"
 // lib/render/subscription.js
 const { renderKpiRow } = require('./kpis');
 const { renderTable } = require('./table');
-const { formatMoney, formatPercent, formatNumber } = require('./format');
+const { formatPercent, formatNumber } = require('./format');
 
 function renderSubscriptionTab({ aov, newCustomers, returningCustomers }) {
   const total = newCustomers + returningCustomers;
   const newShare = total > 0 ? newCustomers / total : 0;
 
   const kpiRow = renderKpiRow([
-    { icon: 'AVG ORDER VALUE · last 30d', big: formatMoney(aov), cap: 'net sales ÷ orders' },
+    // AOV needs pence precision (matches the original dashboard's "£19.37"); formatMoney (Task 14)
+    // rounds to the nearest whole pound, which is right for large totals but wrong here — format locally.
+    { icon: 'AVG ORDER VALUE · last 30d', big: `£${aov.toFixed(2)}`, cap: 'net sales ÷ orders' },
     {
       icon: 'NEW CUSTOMER SHARE',
       big: formatPercent(newShare),

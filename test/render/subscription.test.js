@@ -5,7 +5,7 @@ const { renderSubscriptionTab } = require('../../lib/render/subscription');
 
 test('renders AOV and new-customer-share KPI cards', () => {
   const html = renderSubscriptionTab({ aov: 19.37, newCustomers: 5088, returningCustomers: 3046 });
-  assert.match(html, /£19\b/);
+  assert.match(html, /£19\.37/);
   assert.match(html, />62\.6%</); // 5088 / 8134
   assert.match(html, /5,088 new of 8,134/);
 });
