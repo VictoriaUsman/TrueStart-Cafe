@@ -3,22 +3,12 @@ const { fetchWindsorData } = require('../lib/windsor');
 const { getAccessToken } = require('../lib/google-sheets-auth');
 const { overwriteSheetRange } = require('../lib/google-sheets-writer');
 const { mapGoogleDailyRows, mapMetaDailyRows } = require('../lib/transform/windsor-to-sheet-rows');
+const { dateRange } = require('../lib/dates');
 
 const FACEBOOK_ACCOUNT_ID = '732629205086';
 const GOOGLE_ADS_ACCOUNT_ID = '779-598-7920';
 const WINDOW_DAYS = 90;
 const REQUIRED_ENV_VARS = ['WINDSOR_API_KEY', 'GOOGLE_SHEET_ID', 'GOOGLE_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_SERVICE_ACCOUNT_KEY'];
-
-function isoDay(d) {
-  return d.toISOString().slice(0, 10);
-}
-
-function dateRange(days, referenceDate = new Date()) {
-  const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()));
-  const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - (days - 1));
-  return { dateFrom: isoDay(start), dateTo: isoDay(end) };
-}
 
 async function syncWindsor(env) {
   const missing = REQUIRED_ENV_VARS.filter((key) => !env[key]);

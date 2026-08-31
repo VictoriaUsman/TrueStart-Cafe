@@ -3,9 +3,11 @@
     { "source": "/", "destination": "/api/dashboard" }
   ],
   "crons": [
-    { "path": "/api/sync-windsor", "schedule": "0 6 * * *" }
+    { "path": "/api/sync-windsor", "schedule": "0 6 * * *" },
+    { "path": "/api/sync-shopify", "schedule": "10 6 * * *" }
   ],
   "functions": {
-    "api/sync-windsor.js": { "maxDuration": 60 }
+    "api/sync-windsor.js": { "maxDuration": 60 },
+    "api/sync-shopify.js": { "maxDuration": 60 }
   }
 }
