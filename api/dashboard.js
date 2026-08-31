@@ -9,6 +9,7 @@ const { buildGoogleCampaignRows } = require('../lib/transform/google-campaigns')
 const { buildFunnelSplit, buildStatusSpend } = require('../lib/transform/overview');
 const { buildBreakdown } = require('../lib/transform/breakdown');
 const { buildCohortTable } = require('../lib/transform/cohort');
+const { buildMonthlyCacSeries } = require('../lib/transform/monthly-cac');
 const { injectDashboard } = require('../lib/template');
 const { renderKpiRow } = require('../lib/render/kpis');
 const { renderGoogleTab } = require('../lib/render/google');
@@ -17,6 +18,7 @@ const { renderOverviewTab } = require('../lib/render/overview');
 const { renderBreakdownCard, renderTwoColumn } = require('../lib/render/breakdowns');
 const { renderCohortTable } = require('../lib/render/cohort');
 const { renderSubscriptionTab } = require('../lib/render/subscription');
+const { renderCacChart } = require('../lib/render/cac-chart');
 const { formatMoney, formatMoneyK } = require('../lib/render/format');
 
 function unavailableNote(label) {
@@ -70,13 +72,14 @@ function deltaCaption(current, previous, { formatFn, direction }) {
 }
 
 async function buildDashboardHtml(env) {
-  const [creatives, googleDaily, metaDaily, shopifyDaily, newReturning, cohort, stock] = await Promise.all([
+  const [creatives, googleDaily, metaDaily, shopifyDaily, newReturning, cohort, cacMonthly, stock] = await Promise.all([
     settleTab('Creatives', env.SHEET_CSV_URL_CREATIVES),
     settleTab('Google Ads', env.SHEET_CSV_URL_GOOGLE_DAILY),
     settleTab('Meta', env.SHEET_CSV_URL_META_DAILY),
     settleTab('Shopify sales', env.SHEET_CSV_URL_SHOPIFY_DAILY),
     settleTab('New vs returning', env.SHEET_CSV_URL_NEW_RETURNING),
     settleTab('Cohort', env.SHEET_CSV_URL_COHORT),
+    settleTab('Monthly CAC trend', env.SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY),
     fetchLowStockSnapshot({ shopDomain: env.SHOPIFY_SHOP_DOMAIN, accessToken: env.SHOPIFY_ACCESS_TOKEN })
       .then((snap) => ({ ok: true, snap }))
       .catch((err) => {
@@ -193,9 +196,14 @@ async function buildDashboardHtml(env) {
 
   const { RS, LB } = buildDailyRoasSeries({ shopifyDailyRows: shopifyDaily.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows });
 
-  const cacChart =
-    '<div class="note" style="font-size:12.5px">Monthly CAC trend is not yet available — it needs a month-by-month ' +
-    'new-customer breakdown this Sheet does not currently provide.</div>';
+  // The month containing the anchor date is still in progress (synced daily, not a full calendar
+  // month yet) — excluded so its partial spend/customer count doesn't distort the newest bar.
+  const anchorMonth = anchorDate.slice(0, 7);
+  const cacChart = metaDaily.ok && googleDaily.ok && cacMonthly.ok
+    ? renderCacChart(buildMonthlyCacSeries({
+        monthlyRows: cacMonthly.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows, excludeMonth: anchorMonth,
+      }))
+    : unavailableNote('Monthly CAC trend');
 
   const html = injectDashboard(
     {

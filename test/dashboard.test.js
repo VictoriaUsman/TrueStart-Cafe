@@ -10,6 +10,7 @@ const ENV = {
   SHEET_CSV_URL_SHOPIFY_DAILY: 'https://example.com/shopify.csv',
   SHEET_CSV_URL_NEW_RETURNING: 'https://example.com/newret.csv',
   SHEET_CSV_URL_COHORT: 'https://example.com/cohort.csv',
+  SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY: 'https://example.com/cac-monthly.csv',
   SHOPIFY_SHOP_DOMAIN: 'test.myshopify.com',
   SHOPIFY_ACCESS_TOKEN: 'tok',
 };
@@ -18,11 +19,12 @@ const CSV_BY_URL = {
   [ENV.SHEET_CSV_URL_CREATIVES]:
     'Ad name,Amount spent (GBP),Impressions,Purchases,Campaign name,Purchases conversion value\n' +
     'BOF_ST_19_Upgrader_Price_Starter_Bags V1,100,1000,25,K-TS_UK_BOF-PROVEN,400\n',
-  [ENV.SHEET_CSV_URL_GOOGLE_DAILY]: 'Campaign,Day,Currency code,Cost,Impr.,Clicks,Conversions,Conv. value\nL - Search - Brand,2026-08-01,GBP,100,1000,50,10,400\n',
-  [ENV.SHEET_CSV_URL_META_DAILY]: 'Campaign name,Day,Impressions,Amount spent (GBP),Link clicks,Purchases,Purchases conversion value,Purchase ROAS,Reporting starts,Reporting ends\nK-TS_UK_BOF-PROVEN,2026-08-01,1000,100,50,25,400,4,2026-08-01,2026-08-01\n',
+  [ENV.SHEET_CSV_URL_GOOGLE_DAILY]: 'Campaign,Day,Currency code,Cost,Impr.,Clicks,Conversions,Conv. value\nL - Search - Brand,2026-08-01,GBP,100,1000,50,10,400\nL - Search - Brand,2026-06-15,GBP,1000,500,25,5,200\n',
+  [ENV.SHEET_CSV_URL_META_DAILY]: 'Campaign name,Day,Impressions,Amount spent (GBP),Link clicks,Purchases,Purchases conversion value,Purchase ROAS,Reporting starts,Reporting ends\nK-TS_UK_BOF-PROVEN,2026-08-01,1000,100,50,25,400,4,2026-08-01,2026-08-01\nK-TS_UK_BOF-PROVEN,2026-06-15,500,3000,25,12,200,4,2026-06-15,2026-06-15\n',
   [ENV.SHEET_CSV_URL_SHOPIFY_DAILY]: 'Day,Orders,Gross sales,Discounts,Sales reversals,Net sales,Shipping charges,Duties,Additional fees,Taxes,Total sales\n01-08-2026,50,1000,0,0,1000,0,0,0,0,1000\n',
   [ENV.SHEET_CSV_URL_NEW_RETURNING]: 'New or returning customer,Customers\nNew,5000\nReturning,3000\n',
   [ENV.SHEET_CSV_URL_COHORT]: 'Month,Months since first purchase,Customers,Customer retention rate,Customers in cohort\n2026-01-08,0,100,1,100\n',
+  [ENV.SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY]: 'Month,New customers,Returning customers\n2026-06-01,200,80\n2026-08-01,50,20\n',
 };
 
 function mockFetchAllOk() {
@@ -44,9 +46,46 @@ test('builds a full HTML page when every source succeeds', async () => {
     assert.match(html, /BOF_ST_19_Upgrader_Price_Starter_Bags V1/); // DATA literal present
     assert.doesNotMatch(html, /<!--INJECT:/);
     assert.doesNotMatch(html, /\/\*INJECT:/);
-    // The static, fabricated CAC monthly bar chart must be replaced with an honest placeholder note.
-    assert.match(html, /Monthly CAC trend is not yet available/);
-    assert.doesNotMatch(html, /£40\.83/);
+    // Real monthly CAC chart: June is a complete month with matching spend+new-customer data,
+    // so it renders as a bar (£4000 spend ÷ 200 new customers = £20.00 CAC). August is the
+    // current in-progress month (matches the anchor date) and must be excluded.
+    assert.match(html, /£20\.00/);
+    assert.match(html, />June</);
+    assert.doesNotMatch(html, /Monthly CAC trend is not yet available/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('degrades the Monthly CAC trend chart when its Sheet tab fails, leaving other sections intact', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async (url) => {
+    if (url === ENV.SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY) return { ok: false, status: 500, text: async () => '' };
+    if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
+    return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };
+  });
+  try {
+    const html = await buildDashboardHtml(ENV);
+    assert.match(html, /Monthly CAC trend data is temporarily unavailable/is);
+    assert.match(html, /BOF_ST_19_Upgrader_Price_Starter_Bags V1/); // other sections still rendered
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('shows a graceful "not enough data" note instead of a chart when no month is complete yet', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async (url) => {
+    // Only the current in-progress month has data — it gets excluded, leaving nothing to chart.
+    if (url === ENV.SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY) {
+      return { ok: true, status: 200, text: async () => 'Month,New customers,Returning customers\n2026-08-01,50,20\n' };
+    }
+    if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
+    return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };
+  });
+  try {
+    const html = await buildDashboardHtml(ENV);
+    assert.match(html, /not enough/i);
   } finally {
     global.fetch = originalFetch;
   }
