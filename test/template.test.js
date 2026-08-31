@@ -1,7 +1,7 @@
 // test/template.test.js
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { injectDashboard } = require('../lib/template');
+const { injectDashboard, injectIntoHtml } = require('../lib/template');
 
 const SECTIONS = {
   kpiTop: '<div class="kpis">TOP</div>',
@@ -53,8 +53,30 @@ test('leaves the surrounding CSS and script functions untouched', () => {
 });
 
 test('throws a descriptive error if a marker is missing from the template (template drift guard)', () => {
-  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
-  assert.match(original, /<!--INJECT:KPI_TOP-->/, 'template.html must still contain the KPI_TOP marker for this test to be meaningful');
+  // Exercise the actual throw path against a deliberately-broken in-memory template that is
+  // missing the KPI_TOP marker, rather than only asserting the marker exists in the real file.
+  const brokenTemplate = '<html><body>no markers here, KPI_TOP is missing on purpose</body></html>';
+  assert.throws(() => injectIntoHtml(brokenTemplate, SECTIONS, LITERALS), /Template marker <!--INJECT:KPI_TOP--> not found — has lib\/template\.html drifted\?/);
+});
+
+test('throws a descriptive error if a literal marker is missing from the template', () => {
+  // Every HTML_MARKERS section is present so the loop reaches the LITERAL_MARKERS pass,
+  // but no /*INJECT:...*/ markers exist at all.
+  const templateWithHtmlMarkersOnly =
+    '<!--INJECT:KPI_TOP--><!--INJECT:GOOGLE_TAB--><!--INJECT:META_TAB--><!--INJECT:OVERVIEW_TAB-->' +
+    '<!--INJECT:INSIGHTS_TAB--><!--INJECT:PACKPROD_TAB--><!--INJECT:COHORT_TABLE--><!--INJECT:SUBSCRIPTION_TAB-->' +
+    '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><script>no literal markers here</script>';
+  assert.throws(
+    () => injectIntoHtml(templateWithHtmlMarkersOnly, SECTIONS, LITERALS),
+    /Template marker \/\*INJECT:DATA\*\/ not found — has lib\/template\.html drifted\?/
+  );
+});
+
+test('does not throw when every marker the real template.html declares is present', () => {
+  // Sanity check tying injectIntoHtml back to the real file, so the drift guard above stays
+  // meaningful: if lib/template.html ever drops a marker, this fails loudly.
+  const html = injectDashboard(SECTIONS, LITERALS);
+  assert.ok(html);
 });
 
 test('stkLoad/stkBoot guard against a falsy STK_SNAP.asOf (Shopify outage marker) instead of rendering a false all-clear', () => {
