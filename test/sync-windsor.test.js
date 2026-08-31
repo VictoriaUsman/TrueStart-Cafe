@@ -54,45 +54,37 @@ function mockAll({ tokenOk = true, windsorOk = true, sheetsOk = true } = {}) {
   });
 }
 
-test('syncWindsor writes all three tabs and reports rows written when everything succeeds', async () => {
+test('syncWindsor writes both tabs and reports rows written when everything succeeds', async () => {
   const originalFetch = global.fetch;
   global.fetch = mockAll();
   try {
     const result = await syncWindsor(ENV);
-    assert.strictEqual(result.Creatives.ok, true);
-    assert.strictEqual(result.Creatives.rows, 1);
     assert.strictEqual(result.GoogleDaily.ok, true);
     assert.strictEqual(result.GoogleDaily.rows, 1);
     assert.strictEqual(result.MetaDaily.ok, true);
     assert.strictEqual(result.MetaDaily.rows, 1);
+    assert.strictEqual(result.Creatives, undefined); // deliberately not synced — see api/sync-windsor.js
   } finally {
     global.fetch = originalFetch;
   }
 });
 
-test('syncWindsor reports one tab as failed without affecting the other two', async () => {
+test('syncWindsor reports one tab as failed without affecting the other', async () => {
   const originalFetch = global.fetch;
-  let call = 0;
   global.fetch = mock.fn(async (url, opts) => {
-    call += 1;
     if (String(url).includes('oauth2.googleapis.com/token')) return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
-    if (String(url).includes('/facebook?') && String(url).includes('ad_name')) {
-      // Creatives is the only job whose fields list includes ad_name, so this targets only
-      // its facebook request and fails it; MetaDaily's facebook request (no ad_name field) still succeeds.
+    if (String(url).includes('/google_ads?')) {
       return { ok: false, status: 500, json: async () => ({}) };
     }
     if (String(url).includes('connectors.windsor.ai')) {
-      // Non-empty, so GoogleDaily/MetaDaily's writes aren't themselves refused for 0 rows —
-      // this test is specifically about Creatives' failure not affecting the other two tabs.
       return { ok: true, status: 200, json: async () => ({ data: [{ campaign: 'c', date: '2026-08-24' }] }) };
     }
     return { ok: true, status: 200, json: async () => ({}) };
   });
   try {
     const result = await syncWindsor(ENV);
-    assert.strictEqual(result.Creatives.ok, false);
-    assert.match(result.Creatives.error, /Windsor API error \(500\)/);
-    assert.strictEqual(result.GoogleDaily.ok, true);
+    assert.strictEqual(result.GoogleDaily.ok, false);
+    assert.match(result.GoogleDaily.error, /Windsor API error \(500\)/);
     assert.strictEqual(result.MetaDaily.ok, true);
   } finally {
     global.fetch = originalFetch;

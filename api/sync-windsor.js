@@ -2,7 +2,7 @@
 const { fetchWindsorData } = require('../lib/windsor');
 const { getAccessToken } = require('../lib/google-sheets-auth');
 const { overwriteSheetRange } = require('../lib/google-sheets-writer');
-const { mapCreativesRows, mapGoogleDailyRows, mapMetaDailyRows } = require('../lib/transform/windsor-to-sheet-rows');
+const { mapGoogleDailyRows, mapMetaDailyRows } = require('../lib/transform/windsor-to-sheet-rows');
 
 const FACEBOOK_ACCOUNT_ID = '732629205086';
 const GOOGLE_ADS_ACCOUNT_ID = '779-598-7920';
@@ -40,15 +40,13 @@ async function syncWindsor(env) {
     privateKey: env.GOOGLE_SERVICE_ACCOUNT_KEY.replace(/\\n/g, '\n'),
   });
 
+  // Note: the Creatives tab (ad-level Meta data) is deliberately NOT synced here. Windsor's
+  // facebook connector at ad-level granularity takes 20s+ even for a single day's data (verified
+  // directly against the live API), which can never fit inside Vercel Hobby's hard 10s function
+  // timeout. GoogleDaily/MetaDaily are campaign+day-level aggregates and respond in ~2s for the
+  // full 90-day window, so only those two are synced by this job. Creatives stays on whatever
+  // process was updating it before this feature existed.
   const jobs = [
-    {
-      tab: 'Creatives',
-      fetchPromise: fetchWindsorData({
-        apiKey: env.WINDSOR_API_KEY, connector: 'facebook', accountId: FACEBOOK_ACCOUNT_ID, dateFrom, dateTo,
-        fields: ['date_start', 'date_stop', 'ad_name', 'spend', 'impressions', 'actions_omni_purchase', 'adset_name', 'purchase_roas_omni_purchase', 'link_clicks', 'campaign', 'action_values_omni_purchase'],
-      }),
-      map: mapCreativesRows,
-    },
     {
       tab: 'GoogleDaily',
       fetchPromise: fetchWindsorData({

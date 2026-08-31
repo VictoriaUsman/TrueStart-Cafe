@@ -1,11 +1,13 @@
 # Windsor.ai → Sheet Daily Sync — Design
 
 **Date:** 2026-08-31
-**Status:** Approved, ready for implementation planning
+**Status:** Implemented — scope amended post-deploy, see Section 10
 
 ## 1. Problem
 
 Per the original live-dashboard design (`2026-08-31-live-dashboard-design.md`), the `Creatives`, `GoogleDaily`, and `MetaDaily` tabs of `TrueStart_Dashboard_Data` were assumed to be kept fresh by an existing Windsor.ai subscription "on its own schedule," external to this codebase. In practice, that external process is owned by a teammate and isn't something this project can rely on or observe. This design replaces that assumption with an owned, scheduled sync: a job in this codebase that pulls Meta/Google ad data directly from the Windsor.ai API and writes it into those same Sheet tabs.
+
+**Amendment (post-deploy):** `Creatives` was dropped from this job's scope — see Section 10. Everywhere below that still says "the three ad-data tabs" or lists `Creatives` as a sync target describes the original design intent, not the final shipped behavior.
 
 **This supersedes one line of the original spec's Section 11** ("Writing back to the Sheet or Shopify — this is read-only in both directions"): the Sheet write path described here is a deliberate, narrow exception, scoped only to the three ad-data tabs below. Everything else (Shopify, the other five Sheet tabs, the dashboard's own read path) remains read-only, unchanged.
 
@@ -83,12 +85,30 @@ Each tab's fetch+map+write is wrapped independently (one `try/catch` per tab):
 2. ✅ Create Google Cloud project `truestart-dashboard`, enable the Sheets API, create service account `sheet-writer@truestart-dashboard.iam.gserviceaccount.com`, download its JSON key.
 3. ✅ Share `TrueStart_Dashboard_Data` with that service account email as Editor.
 4. ✅ Confirm read/write access end-to-end with a one-off verification script.
-5. ⬜ Add `WINDSOR_API_KEY`, `GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_KEY`, and a generated `CRON_SECRET` as Vercel environment variables (Production + Preview), same as the Shopify vars.
+5. ✅ Add `WINDSOR_API_KEY`, `GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_KEY`, and a generated `CRON_SECRET` as Vercel environment variables (Production + Preview), same as the Shopify vars.
 
-## 9. Explicitly out of scope for this iteration
+## 9. Post-deploy amendment: Creatives dropped from scope
+
+The Kalilos Vercel team is on the Hobby (free) plan, which hard-caps serverless function duration at 10 seconds (`maxDuration` in `vercel.json` is silently ignored below Pro). Live testing against the real Windsor.ai API found:
+
+| Query | Response time |
+|---|---|
+| `Creatives` (facebook, ad-level), 90-day window | timed out (>60s) |
+| `Creatives` (facebook, ad-level), 7-day window | 23s |
+| `Creatives` (facebook, ad-level), **1-day** window | timed out (>21s) |
+| `GoogleDaily` (google_ads, campaign+day level), 90-day window | 2.0s |
+| `MetaDaily` (facebook, campaign+day level), 90-day window | 2.1s |
+
+Windsor's `facebook` connector at **ad-level** granularity is slow regardless of date-range size — even a single day takes 20s+ on Windsor's own backend, so no window-size adjustment or code-side optimization on our end could make it fit inside Hobby's 10s cap. Campaign+day-level aggregates (`GoogleDaily`, `MetaDaily`) are unaffected and respond in ~2s even at the full 90-day window.
+
+**Decision:** `Creatives` is dropped from this job's scope entirely. `api/sync-windsor.js` only ever syncs `GoogleDaily` and `MetaDaily`. `Creatives` remains on whatever process was updating it before this feature existed (the teammate's original Windsor.ai → Sheet setup, if still active) — this codebase makes no changes to it and doesn't assume it's still running (same caveat as Section 9's last bullet).
+
+**Possible future path, not investigated:** Windsor may offer an async/batch export pattern (start a job, poll for completion) for heavy ad-level queries, which could fit a scheduled-job model better than a single synchronous request. Not explored in this iteration.
+
+## 10. Explicitly out of scope for this iteration
 
 - Any change to how the dashboard itself reads data — it stays 100% CSV-based, unaware Windsor exists.
-- Writing to any tab other than `Creatives`, `GoogleDaily`, `MetaDaily`.
+- Writing to any tab other than `GoogleDaily`, `MetaDaily` (see Section 9 — `Creatives` was in original scope, dropped post-deploy).
 - Historical backfill beyond 90 days, or preserving history longer than the rolling window.
 - Alerting/notification on sync failure beyond the endpoint's own JSON response and Vercel's function logs.
-- Removing or replacing the teammate's original Windsor.ai → Sheet process, if one still runs independently — this design doesn't assume it's disabled, only that this job's own writes are authoritative for the three tabs above at the time it runs.
+- Removing or replacing the teammate's original Windsor.ai → Sheet process, if one still runs independently — this design doesn't assume it's disabled, only that this job's own writes are authoritative for the tabs above at the time it runs.
