@@ -2,7 +2,29 @@
 const { test, mock } = require('node:test');
 const assert = require('node:assert');
 const crypto = require('node:crypto');
-const { syncCreativesChunk, chunkDateRange, bandStartRow, CHUNK_COUNT } = require('../api/sync-creatives');
+const { syncCreativesChunk, chunkDateRange, bandStartRow, CHUNK_COUNT, BAND_SIZE } = require('../api/sync-creatives');
+
+const CREATIVES_TAB_ROW_CAPACITY = 2500;
+
+// The two handler tests below need the real env vars present on process.env. Capture whatever was
+// there first so the mutation can be undone — otherwise these tests leak fake credentials into
+// every test that runs after them in the same process.
+function applyEnv(vars) {
+  const previous = Object.fromEntries(Object.keys(vars).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, vars);
+  return () => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+}
+
+function nextDay(date) {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d;
+}
 
 // getAccessToken signs a real JWT with crypto.createSign().sign() before making an HTTP call,
 // so the key must be a structurally valid PEM even though the mocked oauth2 endpoint never
@@ -20,11 +42,36 @@ const ENV = {
   GOOGLE_SERVICE_ACCOUNT_KEY: FAKE_PRIVATE_KEY,
 };
 
-test('chunkDateRange computes a 5-day, yesterday-anchored window per chunk index', () => {
+// Hand-verified for ref 2026-09-01: yesterday is 2026-08-31 = epoch day 20696
+// (20454 days to 2026-01-01, + 242 days to Aug 31). floor(20696 / 5) = 4139, so chunk 0 owns
+// block 4139 = epoch days 20695..20699 = 2026-08-30..2026-09-03, and each higher chunk index
+// steps back exactly one 5-day block.
+test('chunkDateRange anchors each chunk to a fixed 5-day calendar block, not a relative days-ago offset', () => {
   const ref = new Date('2026-09-01T12:00:00Z');
-  assert.deepStrictEqual(chunkDateRange(0, ref), { dateFrom: '2026-08-27', dateTo: '2026-08-31' });
-  assert.deepStrictEqual(chunkDateRange(1, ref), { dateFrom: '2026-08-22', dateTo: '2026-08-26' });
-  assert.deepStrictEqual(chunkDateRange(5, ref), { dateFrom: '2026-08-02', dateTo: '2026-08-06' });
+  assert.deepStrictEqual(chunkDateRange(0, ref), { dateFrom: '2026-08-30', dateTo: '2026-09-03' });
+  assert.deepStrictEqual(chunkDateRange(1, ref), { dateFrom: '2026-08-25', dateTo: '2026-08-29' });
+  assert.deepStrictEqual(chunkDateRange(2, ref), { dateFrom: '2026-08-20', dateTo: '2026-08-24' });
+  assert.deepStrictEqual(chunkDateRange(3, ref), { dateFrom: '2026-08-15', dateTo: '2026-08-19' });
+  assert.deepStrictEqual(chunkDateRange(4, ref), { dateFrom: '2026-08-10', dateTo: '2026-08-14' });
+  assert.deepStrictEqual(chunkDateRange(5, ref), { dateFrom: '2026-08-05', dateTo: '2026-08-09' });
+});
+
+test('the 6 chunk windows tile the calendar with zero overlap and zero gap', () => {
+  const ref = new Date('2026-09-01T12:00:00Z');
+  for (let chunk = 0; chunk < CHUNK_COUNT - 1; chunk += 1) {
+    const newer = chunkDateRange(chunk, ref);
+    const older = chunkDateRange(chunk + 1, ref);
+    const dayAfterOlderEnd = nextDay(new Date(`${older.dateTo}T00:00:00Z`)).toISOString().slice(0, 10);
+    assert.strictEqual(
+      newer.dateFrom, dayAfterOlderEnd,
+      `chunk ${chunk} must start the day after chunk ${chunk + 1} ends`
+    );
+  }
+});
+
+test('chunkDateRange returns the same window one day later, so a late retry does not drift', () => {
+  const ref = new Date('2026-09-01T12:00:00Z');
+  assert.deepStrictEqual(chunkDateRange(2, nextDay(ref)), chunkDateRange(2, ref));
 });
 
 test('bandStartRow reserves a 400-row band per chunk, starting after the header row', () => {
@@ -33,17 +80,26 @@ test('bandStartRow reserves a 400-row band per chunk, starting after the header 
   assert.strictEqual(bandStartRow(5), 2002);
 });
 
-function mockAll({ windsorOk = true, sheetsOk = true } = {}) {
+test('the 6 bands tile the sheet contiguously and fit inside the live tab row capacity', () => {
+  for (let chunk = 0; chunk < CHUNK_COUNT - 1; chunk += 1) {
+    assert.strictEqual(bandStartRow(chunk) + BAND_SIZE, bandStartRow(chunk + 1));
+  }
+  assert.ok(
+    bandStartRow(CHUNK_COUNT - 1) + BAND_SIZE - 1 <= CREATIVES_TAB_ROW_CAPACITY,
+    `last band ends at row ${bandStartRow(CHUNK_COUNT - 1) + BAND_SIZE - 1}, past the tab's ${CREATIVES_TAB_ROW_CAPACITY}-row capacity`
+  );
+});
+
+const ONE_WINDSOR_AD = [{ ad_name: 'Ad 1', spend: 10, campaign: 'Camp A', adset_name: 'Adset A' }];
+
+function mockAll({ windsorOk = true, sheetsOk = true, windsorData = ONE_WINDSOR_AD } = {}) {
   return mock.fn(async (url, opts) => {
     if (String(url).includes('oauth2.googleapis.com/token')) {
       return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
     }
     if (String(url).includes('connectors.windsor.ai')) {
       if (!windsorOk) return { ok: false, status: 500, json: async () => ({}) };
-      return {
-        ok: true, status: 200,
-        json: async () => ({ data: [{ ad_name: 'Ad 1', spend: 10, campaign: 'Camp A', adset_name: 'Adset A' }] }),
-      };
+      return { ok: true, status: 200, json: async () => ({ data: windsorData }) };
     }
     if (String(url).includes('sheets.googleapis.com')) {
       return sheetsOk ? { ok: true, status: 200, json: async () => ({}) } : { ok: false, status: 403, json: async () => ({}) };
@@ -60,6 +116,53 @@ test('syncCreativesChunk fetches, aggregates, and writes one chunk\'s band, repo
     assert.deepStrictEqual(result, { ok: true, rows: 1 });
   } finally {
     global.fetch = originalFetch;
+  }
+});
+
+test('syncCreativesChunk requests its own chunk\'s date window from Windsor and writes its own band', async () => {
+  const originalFetch = global.fetch;
+  const fetchMock = mockAll();
+  global.fetch = fetchMock;
+  try {
+    await syncCreativesChunk(ENV, 3);
+
+    const windsorCall = fetchMock.mock.calls.find((c) => String(c.arguments[0]).includes('connectors.windsor.ai'));
+    assert.ok(windsorCall, 'expected a Windsor fetch');
+    const windsorUrl = new URL(String(windsorCall.arguments[0]));
+    const expected = chunkDateRange(3, new Date());
+    assert.strictEqual(windsorUrl.pathname, '/facebook');
+    assert.strictEqual(windsorUrl.searchParams.get('date_from'), expected.dateFrom);
+    assert.strictEqual(windsorUrl.searchParams.get('date_to'), expected.dateTo);
+    assert.strictEqual(windsorUrl.searchParams.get('account_id'), '732629205086');
+
+    const putCall = fetchMock.mock.calls.find(
+      (c) => String(c.arguments[0]).includes('sheets.googleapis.com') && c.arguments[1] && c.arguments[1].method === 'PUT'
+    );
+    assert.ok(putCall, 'expected a Sheets values.update PUT');
+    assert.strictEqual(bandStartRow(3), 1202);
+    assert.ok(
+      decodeURIComponent(String(putCall.arguments[0])).includes('/values/Creatives!A1202?'),
+      `Sheets PUT targeted the wrong range: ${putCall.arguments[0]}`
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('syncCreativesChunk leaves the band untouched when Windsor returns zero ads', async () => {
+  const originalFetch = global.fetch;
+  const originalWarn = console.warn;
+  const fetchMock = mockAll({ windsorData: [] });
+  global.fetch = fetchMock;
+  console.warn = () => {};
+  try {
+    const result = await syncCreativesChunk(ENV, 4);
+    assert.deepStrictEqual(result, { ok: true, rows: 0, skipped: 'empty-response' });
+    const googleCalls = fetchMock.mock.calls.filter((c) => String(c.arguments[0]).includes('sheets.googleapis.com') || String(c.arguments[0]).includes('oauth2.googleapis.com'));
+    assert.strictEqual(googleCalls.length, 0);
+  } finally {
+    global.fetch = originalFetch;
+    console.warn = originalWarn;
   }
 });
 
@@ -116,6 +219,29 @@ test('handler rejects requests without the correct CRON_SECRET bearer token', as
   }
 });
 
+test('handler fails closed with 500 when CRON_SECRET is not configured', async () => {
+  const { default: handler } = require('../api/sync-creatives');
+  const originalSecret = process.env.CRON_SECRET;
+  const originalFetch = global.fetch;
+  delete process.env.CRON_SECRET;
+  const fetchMock = mock.fn(async () => { throw new Error('should not be called'); });
+  global.fetch = fetchMock;
+  try {
+    for (const authorization of ['Bearer undefined', 'Bearer anything', '']) {
+      let statusCode;
+      const req = { headers: { authorization }, query: { chunk: '0' } };
+      const res = { status(code) { statusCode = code; return this; }, send() { return this; }, json() { return this; } };
+      await handler(req, res);
+      assert.strictEqual(statusCode, 500, `authorization=${JSON.stringify(authorization)} should not authenticate`);
+    }
+    assert.strictEqual(fetchMock.mock.calls.length, 0);
+  } finally {
+    if (originalSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalSecret;
+    global.fetch = originalFetch;
+  }
+});
+
 test('handler rejects a missing or out-of-range chunk query param with 400, without touching the network', async () => {
   const { default: handler } = require('../api/sync-creatives');
   const originalSecret = process.env.CRON_SECRET;
@@ -124,7 +250,7 @@ test('handler rejects a missing or out-of-range chunk query param with 400, with
   const fetchMock = mock.fn(async () => { throw new Error('should not be called'); });
   global.fetch = fetchMock;
   try {
-    for (const chunk of [undefined, '6', '-1', 'not-a-number']) {
+    for (const chunk of [undefined, '', '  ', '6', '-1', '1.5', '+1', 'not-a-number']) {
       let statusCode, body;
       const req = { headers: { authorization: 'Bearer right-secret' }, query: chunk === undefined ? {} : { chunk } };
       const res = { status(code) { statusCode = code; return this; }, json(b) { body = b; return this; }, send() { return this; } };
@@ -144,7 +270,7 @@ test('handler responds 200 with the sync result for a valid chunk and correct se
   const originalSecret = process.env.CRON_SECRET;
   const originalFetch = global.fetch;
   process.env.CRON_SECRET = 'right-secret';
-  Object.assign(process.env, ENV);
+  const restoreEnv = applyEnv(ENV);
   global.fetch = mockAll();
   try {
     let statusCode, body;
@@ -155,6 +281,7 @@ test('handler responds 200 with the sync result for a valid chunk and correct se
     assert.deepStrictEqual(body, { ok: true, rows: 1 });
   } finally {
     process.env.CRON_SECRET = originalSecret;
+    restoreEnv();
     global.fetch = originalFetch;
   }
 });
@@ -164,7 +291,7 @@ test('handler responds 500 with ok:false when the chunk sync throws', async () =
   const originalSecret = process.env.CRON_SECRET;
   const originalFetch = global.fetch;
   process.env.CRON_SECRET = 'right-secret';
-  Object.assign(process.env, ENV);
+  const restoreEnv = applyEnv(ENV);
   global.fetch = mockAll({ windsorOk: false });
   try {
     let statusCode, body;
@@ -176,6 +303,7 @@ test('handler responds 500 with ok:false when the chunk sync throws', async () =
     assert.match(body.error, /Windsor API error \(500\)/);
   } finally {
     process.env.CRON_SECRET = originalSecret;
+    restoreEnv();
     global.fetch = originalFetch;
   }
 });
