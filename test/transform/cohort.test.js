@@ -48,3 +48,8 @@ test('skips a row with a blank/unparseable Month instead of mislabeling or throw
   assert.strictEqual(table.length, 1);
   assert.strictEqual(table[0].cohortLabel, 'Aug 2025');
 });
+
+test('parses a comma-formatted cohort size correctly (Google Sheets CSV export renders e.g. "13,905")', () => {
+  const table = buildCohortTable([row('2025-08-08', 1, '13,905', 0.067)]);
+  assert.strictEqual(table[0].size, 13905);
+});

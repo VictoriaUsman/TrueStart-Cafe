@@ -45,3 +45,12 @@ test('buildGoogleCampaignRows gives 0 (not NaN/Infinity) CPA/ROAS/CTR when conve
   assert.strictEqual(out[0].roas, 0);
   assert.strictEqual(out[0].ctr, 0);
 });
+
+test('buildGoogleCampaignRows parses comma-formatted large numbers correctly (Google Sheets CSV export renders e.g. Impr. as "13,905")', () => {
+  const rows = [{ Campaign: 'X', Day: '2026-07-20', Cost: '1,234.56', 'Impr.': '13,905', Clicks: '1,000', Conversions: '10', 'Conv. value': '5,000' }];
+  const { rows: out } = buildGoogleCampaignRows(rows, { start: '2026-07-20', end: '2026-08-18' });
+  assert.strictEqual(out[0].cost, 1234.56);
+  assert.strictEqual(out[0].impr, 13905);
+  assert.strictEqual(out[0].clicks, 1000);
+  assert.strictEqual(out[0].convValue, 5000);
+});

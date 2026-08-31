@@ -28,6 +28,12 @@ test('sumInWindow skips rows with a blank/unparseable date instead of throwing',
   assert.strictEqual(total, 100);
 });
 
+test('sumInWindow parses a comma-formatted large number correctly (Google Sheets CSV export renders e.g. "13,905")', () => {
+  const rows = [{ Day: '2026-07-20', Cost: '13,905.50' }];
+  const total = sumInWindow(rows, { dateKey: 'Day', valueKey: 'Cost', start: '2026-07-20', end: '2026-08-18' });
+  assert.strictEqual(total, 13905.5);
+});
+
 test('blendedMER divides Shopify sales by combined paid spend', () => {
   assert.strictEqual(blendedMER({ shopifySales: 104800, metaSpend: 28700, googleSpend: 12800 }), 104800 / 41500);
 });

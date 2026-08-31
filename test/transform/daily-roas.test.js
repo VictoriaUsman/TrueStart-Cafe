@@ -53,3 +53,12 @@ test('a day with zero paid spend gets ROAS 0, not Infinity/NaN', () => {
   });
   assert.deepStrictEqual(RS, [0]);
 });
+
+test('parses comma-formatted large sales/spend numbers correctly (Google Sheets CSV export renders e.g. "13,905")', () => {
+  const { RS } = buildDailyRoasSeries({
+    shopifyDailyRows: [{ Day: '2026-02-15', 'Total sales': '13,905' }],
+    metaDailyRows: [{ Day: '2026-02-15', 'Amount spent (GBP)': '1,000' }],
+    googleDailyRows: [{ Day: '2026-02-15', Cost: '390.5' }],
+  });
+  assert.deepStrictEqual(RS, [Math.round((13905 / 1390.5) * 100) / 100]);
+});

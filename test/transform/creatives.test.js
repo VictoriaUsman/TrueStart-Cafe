@@ -59,3 +59,11 @@ test('skips rows with no ad name', () => {
   const data = buildCreativesData([row({ 'Ad name': '' })]);
   assert.strictEqual(data.length, 0);
 });
+
+test('parses comma-formatted large numbers correctly (Google Sheets CSV export renders e.g. Impressions as "13,905")', () => {
+  const data = buildCreativesData([row({ 'Amount spent (GBP)': '1,234.56', 'Impressions': '13,905', 'Purchases': '1,000', 'Purchases conversion value': '5,000' })]);
+  assert.strictEqual(data[0].spend, 1234.56);
+  assert.strictEqual(data[0].impr, 13905);
+  assert.strictEqual(data[0].purch, 1000);
+  assert.strictEqual(data[0].val, 5000);
+});
