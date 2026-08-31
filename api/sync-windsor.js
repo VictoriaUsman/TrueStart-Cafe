@@ -31,11 +31,11 @@ async function syncWindsor(env) {
   });
 
   // Note: the Creatives tab (ad-level Meta data) is deliberately NOT synced here. Windsor's
-  // facebook connector at ad-level granularity takes 20s+ even for a single day's data (verified
-  // directly against the live API), which can never fit inside Vercel Hobby's hard 10s function
-  // timeout. GoogleDaily/MetaDaily are campaign+day-level aggregates and respond in ~2s for the
-  // full 90-day window, so only those two are synced by this job. Creatives stays on whatever
-  // process was updating it before this feature existed.
+  // facebook connector at ad-level granularity is too slow/unreliable for a single Vercel Hobby
+  // function call (verified directly against the live API: timings ranging 1.6s-31s and outright
+  // failures, regardless of date-range width). GoogleDaily/MetaDaily are campaign+day-level
+  // aggregates and respond in ~2s for the full 90-day window, so only those two are synced by this
+  // job. Creatives has its own chunked sync instead — see api/sync-creatives.js.
   const jobs = [
     {
       tab: 'GoogleDaily',

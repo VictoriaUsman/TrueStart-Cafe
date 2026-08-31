@@ -4,10 +4,17 @@
   ],
   "crons": [
     { "path": "/api/sync-windsor", "schedule": "0 6 * * *" },
-    { "path": "/api/sync-shopify", "schedule": "10 6 * * *" }
+    { "path": "/api/sync-shopify", "schedule": "10 6 * * *" },
+    { "path": "/api/sync-creatives?chunk=0", "schedule": "20 6 * * *" },
+    { "path": "/api/sync-creatives?chunk=1", "schedule": "25 6 * * *" },
+    { "path": "/api/sync-creatives?chunk=2", "schedule": "30 6 * * *" },
+    { "path": "/api/sync-creatives?chunk=3", "schedule": "35 6 * * *" },
+    { "path": "/api/sync-creatives?chunk=4", "schedule": "40 6 * * *" },
+    { "path": "/api/sync-creatives?chunk=5", "schedule": "45 6 * * *" }
   ],
   "functions": {
     "api/sync-windsor.js": { "maxDuration": 60 },
-    "api/sync-shopify.js": { "maxDuration": 60 }
+    "api/sync-shopify.js": { "maxDuration": 60 },
+    "api/sync-creatives.js": { "maxDuration": 60 }
   }
 }
