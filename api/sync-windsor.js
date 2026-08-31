@@ -30,7 +30,12 @@ async function syncWindsor(env) {
   // would otherwise distort the most recent point on any daily chart built from this data.
   const yesterday = new Date(Date.now() - 86400000);
   const { dateFrom, dateTo } = dateRange(WINDOW_DAYS, yesterday);
-  const accessToken = await getAccessToken({
+
+  // Kick off the token exchange and all three Windsor fetches in the same tick, rather than
+  // waiting for the token before starting any Windsor call. This keeps the token exchange's
+  // latency off the critical path, which matters on a Hobby-plan Vercel function (hard 10s cap,
+  // not configurable via maxDuration) — this endpoint's total work would otherwise risk timing out.
+  const tokenPromise = getAccessToken({
     clientEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     privateKey: env.GOOGLE_SERVICE_ACCOUNT_KEY.replace(/\\n/g, '\n'),
   });
@@ -38,7 +43,7 @@ async function syncWindsor(env) {
   const jobs = [
     {
       tab: 'Creatives',
-      fetch: () => fetchWindsorData({
+      fetchPromise: fetchWindsorData({
         apiKey: env.WINDSOR_API_KEY, connector: 'facebook', accountId: FACEBOOK_ACCOUNT_ID, dateFrom, dateTo,
         fields: ['date_start', 'date_stop', 'ad_name', 'spend', 'impressions', 'actions_omni_purchase', 'adset_name', 'purchase_roas_omni_purchase', 'link_clicks', 'campaign', 'action_values_omni_purchase'],
       }),
@@ -46,7 +51,7 @@ async function syncWindsor(env) {
     },
     {
       tab: 'GoogleDaily',
-      fetch: () => fetchWindsorData({
+      fetchPromise: fetchWindsorData({
         apiKey: env.WINDSOR_API_KEY, connector: 'google_ads', accountId: GOOGLE_ADS_ACCOUNT_ID, dateFrom, dateTo,
         fields: ['campaign', 'date', 'currency', 'cost', 'impressions', 'clicks', 'conversions', 'conversion_value'],
       }),
@@ -54,7 +59,7 @@ async function syncWindsor(env) {
     },
     {
       tab: 'MetaDaily',
-      fetch: () => fetchWindsorData({
+      fetchPromise: fetchWindsorData({
         apiKey: env.WINDSOR_API_KEY, connector: 'facebook', accountId: FACEBOOK_ACCOUNT_ID, dateFrom, dateTo,
         fields: ['campaign', 'date', 'impressions', 'spend', 'link_clicks', 'actions_omni_purchase', 'action_values_omni_purchase', 'purchase_roas_omni_purchase'],
       }),
@@ -65,7 +70,7 @@ async function syncWindsor(env) {
   const results = {};
   await Promise.all(jobs.map(async (job) => {
     try {
-      const windsorRows = await job.fetch();
+      const [accessToken, windsorRows] = await Promise.all([tokenPromise, job.fetchPromise]);
       const sheetRows = job.map(windsorRows);
       await overwriteSheetRange({
         accessToken,
