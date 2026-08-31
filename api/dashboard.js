@@ -10,6 +10,7 @@ const { buildFunnelSplit, buildStatusSpend } = require('../lib/transform/overvie
 const { buildBreakdown } = require('../lib/transform/breakdown');
 const { buildCohortTable } = require('../lib/transform/cohort');
 const { buildLtvTable } = require('../lib/transform/ltv');
+const { buildDailyAovComparisonSeries } = require('../lib/transform/daily-aov');
 const { buildMonthlyCacSeries } = require('../lib/transform/monthly-cac');
 const { injectDashboard } = require('../lib/template');
 const { renderKpiRow } = require('../lib/render/kpis');
@@ -198,12 +199,17 @@ async function buildDashboardHtml(env) {
   const aov = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Net sales', start, end }) /
     (sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Orders', start, end }) || 1);
 
+  const { current: aovCurrent, previous: aovPrevious, labels: aovLabels } = buildDailyAovComparisonSeries({
+    shopifyDailyRows: shopifyDaily.rows, start, end, prevStart, prevEnd,
+  });
+
   const subscriptionTab = shopifyDaily.ok && newReturning.ok
     ? renderSubscriptionTab({
         aov,
         newCustomers: newReturningTotals.newCustomers,
         returningCustomers: newReturningTotals.returningCustomers,
         ltvRows: cohort.ok ? buildLtvTable(cohortTableData, aov) : [],
+        aovCurrent, aovPrevious, aovLabels,
       })
     : unavailableNote('Subscription & LTV');
 

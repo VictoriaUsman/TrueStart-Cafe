@@ -105,6 +105,19 @@ test('degrades only the Cumulative LTV table (graceful "not enough data" note) w
   }
 });
 
+test('renders the AOV trend chart (current vs previous 30-day window) in the Subscription tab', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchAllOk();
+  try {
+    const html = await buildDashboardHtml(ENV);
+    assert.match(html, /AOV trend/);
+    // The fixture's only Shopify daily row is Aug 1, 2026: £1000 net sales / 50 orders = £20.
+    assert.match(html, /<title>Aug 1: £20\.00<\/title>/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('degrades the Monthly CAC trend chart when its Sheet tab fails, leaving other sections intact', async () => {
   const originalFetch = global.fetch;
   global.fetch = mock.fn(async (url) => {

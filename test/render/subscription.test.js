@@ -46,3 +46,13 @@ test('renders the existing subscriber-metrics placeholder note', () => {
   const html = renderSubscriptionTab({ aov: 19.37, newCustomers: 5088, returningCustomers: 3046 });
   assert.match(html, /Recharge/);
 });
+
+test('renders the AOV trend chart under the AOV KPI card when daily series are provided', () => {
+  const html = renderSubscriptionTab({
+    aov: 19.37, newCustomers: 5088, returningCustomers: 3046,
+    aovCurrent: [20, 22], aovPrevious: [18, 19], aovLabels: ['Aug 1', 'Aug 2'],
+  });
+  assert.match(html, /AOV trend/);
+  assert.match(html, /<svg/);
+  assert.match(html, />Aug 1</);
+});
