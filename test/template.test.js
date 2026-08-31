@@ -72,6 +72,11 @@ test('redraw() recomputes filter button labels/counts from the live DATA array i
   assert.match(original, /b\.textContent=st\+' \('\+count\+'\)';/);
 });
 
+test('ships an empty static <tbody id="tb"> instead of ~117KB of stale rows (redraw() overwrites it at load anyway)', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  assert.match(original, /<tbody id="tb"><\/tbody>/);
+});
+
 test('escapes "</script>" inside an injected literal so it cannot break out of the script tag', () => {
   const html = injectDashboard(SECTIONS, {
     ...LITERALS,
