@@ -28,6 +28,10 @@ The Sheet itself is kept fresh by Windsor.ai (Meta/Google) and Shopify exports o
 
 No subscription/Recharge data exists in the Sheet yet — the Subscription & LTV tab's subscriber-specific metrics (active subscribers, taster→subscribe rate) remain a "coming soon" placeholder note, same as the current static file.
 
+### 2.2 Meta campaigns tab has a sub-feature deferred out of this iteration
+
+The "campaigns" (Meta) tab has a "Campaign view / Action items" toggle: a collapsible per-campaign ad breakdown plus operational recommendations ("graduate this proven ad into the Proven campaign," "archive this paused campaign," "N creatives have a paused leftover copy in another campaign"). The first two recommendation types are derivable from data already covered by this spec (PROVEN-but-not-`in_proven` ads; a campaign with ~£0 current-window spend). The third — detecting a paused duplicate of the same ad running in another campaign — needs per-*ad* currently-delivering status, which the Sheet's Creatives tab doesn't carry (it's a 30-day aggregate per ad, not day-by-day; only campaign-level daily data is available). Per decision, this entire sub-feature is deferred (see Section 11) rather than built on an unreliable proxy.
+
 ## 3. Architecture
 
 **Key discovery from reading the original file's embedded `<script>` in full:** most of the page is not actually static markup waiting to be reimplemented — a meaningful chunk of it is already live client-side JS, driven by a small number of injected data literals:
@@ -37,6 +41,8 @@ No subscription/Recharge data exists in the Sheet yet — the Subscription & LTV
 - `var STK_SNAP={...}` — a Shopify product/inventory snapshot in a specific shape (`{title, productType, handle, variants:{edges:[{node:{title, sku, inventoryQuantity}}]}}`) — drives the entire Stock alerts tab via `stkAdv()`/`stkRender()`/`stkBoot()`, including the "advertised" flag, OOS/LOW classification, and the adjustable threshold (already stored in `localStorage`)
 
 None of that interactive logic needs to be rewritten. The architecture is therefore: **treat the original file as a template**, keep its CSS and script logic byte-for-byte identical, and replace only (a) the few markup fragments that are genuinely static per-request content (KPI cards, Google Ads table, Meta campaigns table, Creative Overview funnel/status bars, Angle & Persona / Pack & Product tables, Subscription & LTV tables, Cohort table) and (b) the `DATA`, `RS`, `LB`, and `STK_SNAP` literals, computed fresh server-side on every request.
+
+The `<tbody id="tb">` for the All Creatives table also does not need server-side rendering — the existing `redraw()` call at the bottom of the script runs unconditionally on page load and populates it from `DATA`. It's safe to ship this `<tbody>` empty in the template.
 
 Single Vercel serverless project, plain Node (no framework):
 
@@ -115,5 +121,6 @@ Public, unlisted Vercel URL. No authentication layer. Relies on the URL not bein
 ## 11. Explicitly out of scope for this iteration
 
 - Subscriber-level Recharge metrics (active subscribers, taster→subscribe rate, subscription LTV) — stays a placeholder note.
+- Meta campaigns tab's "Campaign view / Action items" sub-feature (collapsible per-campaign ad breakdown, graduate/archive/duplicate-cleanup recommendations) — stays a static "coming soon" note (see Section 2.2).
 - Any authentication/access control beyond an unlisted URL.
 - Writing back to the Sheet or Shopify — this is read-only in both directions.
