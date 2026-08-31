@@ -2,3 +2,7 @@ node_modules/
 .vercel
 .env
 *.log
+.env*
+*.json.key
+truestart-dashboard-*.json
+*-service-account*.json
