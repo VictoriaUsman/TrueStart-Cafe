@@ -1,0 +1,10 @@
+{
+  "name": "truestart-live-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  }
+}
