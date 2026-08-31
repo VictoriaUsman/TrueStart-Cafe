@@ -65,6 +65,25 @@ test('degrades only the Google tab when its Sheet fetch fails, leaving other sec
   }
 });
 
+test('a blank/malformed date row in one Sheet tab does not crash the whole page', async () => {
+  const originalFetch = global.fetch;
+  const shopifyWithBadRow =
+    CSV_BY_URL[ENV.SHEET_CSV_URL_SHOPIFY_DAILY] + 'not-a-date,10,200,0,0,200,0,0,0,0,200\n'; // an unparseable date in an otherwise-valid row
+  global.fetch = mock.fn(async (url) => {
+    if (url === ENV.SHEET_CSV_URL_SHOPIFY_DAILY) return { ok: true, status: 200, text: async () => shopifyWithBadRow };
+    if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
+    return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };
+  });
+  try {
+    const html = await buildDashboardHtml(ENV);
+    assert.match(html, /<!doctype html>/i);
+    assert.doesNotMatch(html, /<!--INJECT:/);
+    assert.doesNotMatch(html, /\/\*INJECT:/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('degrades only the Stock section when the Shopify API call fails', async () => {
   const originalFetch = global.fetch;
   global.fetch = mock.fn(async (url) => {

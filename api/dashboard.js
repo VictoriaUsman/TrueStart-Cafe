@@ -52,6 +52,7 @@ function latestDate(rows, dateKey) {
   for (const r of rows) {
     if (!r[dateKey]) continue;
     const d = toIsoDate(r[dateKey]);
+    if (!d) continue;
     if (!max || d > max) max = d;
   }
   return max;

@@ -32,6 +32,19 @@ test('a day with paid spend but no matching Shopify row gets ROAS 0', () => {
   assert.deepStrictEqual(RS, [0]);
 });
 
+test('a row with a blank/unparseable date is skipped instead of throwing', () => {
+  const { RS, LB } = buildDailyRoasSeries({
+    shopifyDailyRows: [
+      { Day: '2026-02-15', 'Total sales': '500' },
+      { Day: '', 'Total sales': '999' },
+    ],
+    metaDailyRows: [{ Day: 'not a date', 'Amount spent (GBP)': '999' }],
+    googleDailyRows: [],
+  });
+  assert.deepStrictEqual(LB, ['Feb 15']);
+  assert.deepStrictEqual(RS, [0]);
+});
+
 test('a day with zero paid spend gets ROAS 0, not Infinity/NaN', () => {
   const { RS } = buildDailyRoasSeries({
     shopifyDailyRows: [{ Day: '15-02-2026', 'Total sales': '500' }],

@@ -18,6 +18,16 @@ test('sumInWindow handles DD-MM-YYYY dated rows the same as ISO', () => {
   assert.strictEqual(total, 1000);
 });
 
+test('sumInWindow skips rows with a blank/unparseable date instead of throwing', () => {
+  const rows = [
+    { Day: '2026-07-20', Cost: '100' },
+    { Day: '', Cost: '999' },
+    { Day: 'not a date', Cost: '999' },
+  ];
+  const total = sumInWindow(rows, { dateKey: 'Day', valueKey: 'Cost', start: '2026-07-20', end: '2026-08-18' });
+  assert.strictEqual(total, 100);
+});
+
 test('blendedMER divides Shopify sales by combined paid spend', () => {
   assert.strictEqual(blendedMER({ shopifySales: 104800, metaSpend: 28700, googleSpend: 12800 }), 104800 / 41500);
 });

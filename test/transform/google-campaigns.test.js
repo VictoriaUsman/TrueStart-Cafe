@@ -28,6 +28,16 @@ test('buildGoogleCampaignRows aggregates cost/impr/clicks/conv within the window
   assert.strictEqual(total.cost, 150);
 });
 
+test('buildGoogleCampaignRows skips a row with a blank/unparseable date instead of throwing', () => {
+  const rows = [
+    { Campaign: 'L - Search - Brand', Day: '2026-07-20', Cost: '100', 'Impr.': '1000', Clicks: '50', Conversions: '10', 'Conv. value': '400' },
+    { Campaign: 'L - Search - Brand', Day: '', Cost: '999', 'Impr.': '1', Clicks: '1', Conversions: '1', 'Conv. value': '1' },
+  ];
+  const { rows: out } = buildGoogleCampaignRows(rows, { start: '2026-07-20', end: '2026-08-18' });
+  assert.strictEqual(out.length, 1);
+  assert.strictEqual(out[0].cost, 100);
+});
+
 test('buildGoogleCampaignRows gives 0 (not NaN/Infinity) CPA/ROAS/CTR when conversions/cost/impr are 0', () => {
   const rows = [{ Campaign: 'X', Day: '2026-07-20', Cost: '0', 'Impr.': '0', Clicks: '0', Conversions: '0', 'Conv. value': '0' }];
   const { rows: out } = buildGoogleCampaignRows(rows, { start: '2026-07-20', end: '2026-08-18' });
