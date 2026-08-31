@@ -66,6 +66,12 @@ test('stkLoad/stkBoot guard against a falsy STK_SNAP.asOf (Shopify outage marker
   assert.match(original, /Stock data is temporarily unavailable — please refresh shortly\.<\/div>/);
 });
 
+test('redraw() recomputes filter button labels/counts from the live DATA array instead of shipping frozen static counts', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  assert.match(original, /const count=st==='All'\?DATA\.length:DATA\.filter\(x=>x\.status===st\)\.length;/);
+  assert.match(original, /b\.textContent=st\+' \('\+count\+'\)';/);
+});
+
 test('escapes "</script>" inside an injected literal so it cannot break out of the script tag', () => {
   const html = injectDashboard(SECTIONS, {
     ...LITERALS,
