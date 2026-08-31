@@ -2805,6 +2805,15 @@ test('replaces every script literal marker with valid, equivalent JSON', () => {
   assert.doesNotMatch(html, /\/\*INJECT:/);
 });
 
+test('escapes "</script>" inside an injected literal so it cannot break out of the script tag', () => {
+  const html = injectDashboard(SECTIONS, {
+    ...LITERALS,
+    DATA: [{ name: '</script><script>alert(1)</script>' }],
+  });
+  assert.doesNotMatch(html, /<\/script><script>alert/);
+  assert.match(html, /\\u003c\/script>\\u003cscript>alert\(1\)\\u003c\/script>/);
+});
+
 test('leaves the surrounding CSS and script functions untouched', () => {
   const html = injectDashboard(SECTIONS, LITERALS);
   assert.match(html, /function stkAdv\(/);
@@ -2862,7 +2871,11 @@ function injectDashboard(sections, literals) {
     if (!html.includes(marker)) {
       throw new Error(`Template marker ${marker} not found — has lib/template.html drifted?`);
     }
-    html = html.replace(marker, () => JSON.stringify(literals[literalKey]));
+    // Escape every '<' so a live value containing "</script>" or "<!--" (e.g. a
+    // Shopify product title or Meta ad name from Task 26's external data) can't
+    // break out of the surrounding <script> tag.
+    const safeJson = JSON.stringify(literals[literalKey]).replace(/</g, '\\u003c');
+    html = html.replace(marker, () => safeJson);
   }
 
   return html;
