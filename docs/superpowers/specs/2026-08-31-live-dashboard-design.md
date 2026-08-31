@@ -30,23 +30,37 @@ No subscription/Recharge data exists in the Sheet yet — the Subscription & LTV
 
 ## 3. Architecture
 
+**Key discovery from reading the original file's embedded `<script>` in full:** most of the page is not actually static markup waiting to be reimplemented — a meaningful chunk of it is already live client-side JS, driven by a small number of injected data literals:
+
+- `const DATA=[...]` — the 399-row creative array (drives the All Creatives table, sorting, and status-filter buttons via `render()`/`redraw()`)
+- `const RS=[...]` / `const LB=[...]` — daily blended-ROAS values and matching date labels, going back to Feb 15 — drives the Master ROAS chart's 7/30/90 toggle and dashed previous-period line via `drawc(days)`
+- `var STK_SNAP={...}` — a Shopify product/inventory snapshot in a specific shape (`{title, productType, handle, variants:{edges:[{node:{title, sku, inventoryQuantity}}]}}`) — drives the entire Stock alerts tab via `stkAdv()`/`stkRender()`/`stkBoot()`, including the "advertised" flag, OOS/LOW classification, and the adjustable threshold (already stored in `localStorage`)
+
+None of that interactive logic needs to be rewritten. The architecture is therefore: **treat the original file as a template**, keep its CSS and script logic byte-for-byte identical, and replace only (a) the few markup fragments that are genuinely static per-request content (KPI cards, Google Ads table, Meta campaigns table, Creative Overview funnel/status bars, Angle & Persona / Pack & Product tables, Subscription & LTV tables, Cohort table) and (b) the `DATA`, `RS`, `LB`, and `STK_SNAP` literals, computed fresh server-side on every request.
+
 Single Vercel serverless project, plain Node (no framework):
 
 ```
 /api/dashboard.js      — request handler: fetch → transform → render → respond
 /lib/sheets.js          — CSV fetch + parse per tab
-/lib/shopify.js         — Shopify Admin API client (live inventory)
+/lib/shopify.js         — Shopify Admin API client; returns data already shaped like STK_SNAP.products
 /lib/transform/
   stage.js              — TOF/MOF/BOF lookup from campaign name
   status.js             — PROVEN/TESTING/STARVED/Feeder classification
   creative-parse.js     — angle/persona/product/format parser from ad name
   kpi.js                — blended MER, CAC, and other cross-source math
+  daily-roas.js         — full-history daily blended ROAS series + date labels (RS/LB)
   cohort.js             — cohort table shaping
-  stock.js              — advertised-SKU cross-reference + low-stock/OOS flags
-/lib/render.js           — builds HTML fragments (tables, SVG charts, KPI cards) matching the current file's exact markup, driven by computed data
+/lib/render.js           — builds HTML fragments for the non-JS-driven sections, matching the current file's exact markup, driven by computed data
+/lib/template.js         — loads the original file as a template and injects the render.js fragments + the DATA/RS/LB/STK_SNAP literals into their exact original spots; everything else (CSS, script functions) passes through unchanged
 ```
 
-On each request: fetch all Sheet tabs (CSV) + live Shopify inventory in parallel → run transforms → render full HTML page → return `text/html`. Response cached at the edge for ~60s (`stale-while-revalidate`) so concurrent visitors don't each trigger fresh upstream fetches.
+On each request: fetch all Sheet tabs (CSV) + live Shopify inventory in parallel → run transforms → inject into the template → return `text/html`. Response cached at the edge for ~60s (`stale-while-revalidate`) so concurrent visitors don't each trigger fresh upstream fetches.
+
+**Stock "advertised" rule (reusing the original's existing, already-proven logic instead of a new ad-name cross-reference):**
+- Excluded outright if `productType + title + handle` matches `/gift|equipment|merch|machine|chocolate|umbrella|boonie|aeropress|cafetiere|filter/i`
+- Otherwise "advertised" if `productType` matches `/starter pack|coffee bags|instant coffee|ground coffee|coffee beans/i`, or `title`/`handle` matches `/taster|starter/i`
+- This logic (`stkAdv`, `stkRender`, `stkBoot`, threshold input) stays in the page's script unchanged — the only server-side job is producing a fresh `STK_SNAP`-shaped object from Shopify's Admin API (lowest-stock ~50 active products, matching the original's `status:active, sort_key:INVENTORY_TOTAL, first:50` query).
 
 ## 4. Business logic rules (confirmed)
 
@@ -60,12 +74,14 @@ On each request: fetch all Sheet tabs (CSV) + live Shopify inventory in parallel
 - **Angle / Persona / Product / Format:** parsed from `Ad name` using the naming convention `..._<Persona>_<Angle>_<Product>_<Format>[ V#]` (e.g. `BOF_ST_19_Upgrader_Price_Starter_Bags V2`). Any name that doesn't match falls back to `"Other"` for each field.
 - **Blended ROAS / MER** = Total Shopify sales ÷ (Meta spend + Google cost), for a given window.
 - **CAC** = (Meta spend + Google spend) ÷ new customers (from New-vs-returning tab), per month.
-- **Stock "advertised" flag:** derived, not a fixed list — cross-reference product names appearing in currently-spending ad/campaign names (Creatives tab) against the live Shopify stock list. A stock item is "advertised" if its product name matches a product name found in active paid media.
-- **Low-stock threshold:** user-adjustable in the UI, default 20 units (same as current static file).
+- **Stock "advertised" flag and low-stock threshold:** see Section 3 — reuses the original page's existing regex rule and `localStorage`-backed threshold input unchanged; not re-derived server-side.
+- **Daily blended ROAS series (`RS`/`LB`):** one value per calendar day covered by the Sheet's Shopify-daily-sales and Meta/Google-by-day tabs (from Feb 15 onward) = that day's Shopify total sales ÷ that day's (Meta spend + Google cost); `LB` is the matching `"Mon D"`-formatted date label for each day, in the same order.
 
 ## 5. Rendering
 
-The existing HTML's CSS block is reused verbatim. Each dynamic section (KPI cards, Google Ads table, Meta campaign tables, funnel bars, angle/persona tables, cohort heatmap, all-creatives list, stock table, SVG line/bar charts) is generated by a JS function that emits the same markup shape as the current static file, parameterized by the computed data — not simple placeholder substitution, since row counts vary per section.
+The existing HTML's CSS block and script functions are reused verbatim (see Section 3). Only two things change per request:
+1. The markup fragments for the non-JS-driven sections (KPI cards, Google Ads table, Meta campaign tables, funnel bars, angle/persona/pack/product tables, subscription/LTV tables, cohort heatmap) — each generated by a JS function that emits the same markup shape as the current static file, parameterized by computed data (not simple placeholder substitution, since row counts vary per section).
+2. The `DATA`, `RS`, `LB`, and `STK_SNAP` JS literals inside the `<script>` block, replaced with freshly computed values in the same shapes the existing script already expects.
 
 ## 6. Error handling
 
@@ -76,7 +92,8 @@ Each section degrades independently:
 
 ## 7. Testing
 
-- Unit tests (Node test runner or Vitest) for each `/lib/transform` module, using the 399-row creative dataset already extracted from the current static file as a golden fixture, plus known-good totals (e.g. current Google Ads table totals, Shopify sales figures) as expected-output checks.
+- Unit tests (Node's built-in test runner) for each `/lib/transform` module, using the 399-row creative dataset already extracted from the current static file as a golden fixture, plus known-good totals (e.g. current Google Ads table totals, Shopify sales figures) as expected-output checks.
+- A template-injection test asserting the final HTML still contains the original's CSS block and script functions (`stkAdv`, `stkRender`, `drawc`, `render`, `redraw`, etc.) unchanged, with only `DATA`/`RS`/`LB`/`STK_SNAP` literals replaced.
 - Manual side-by-side comparison against the current static file immediately after first deploy, tab by tab.
 
 ## 8. Access & security
