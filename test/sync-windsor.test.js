@@ -82,7 +82,9 @@ test('syncWindsor reports one tab as failed without affecting the other two', as
       return { ok: false, status: 500, json: async () => ({}) };
     }
     if (String(url).includes('connectors.windsor.ai')) {
-      return { ok: true, status: 200, json: async () => ({ data: [] }) };
+      // Non-empty, so GoogleDaily/MetaDaily's writes aren't themselves refused for 0 rows —
+      // this test is specifically about Creatives' failure not affecting the other two tabs.
+      return { ok: true, status: 200, json: async () => ({ data: [{ campaign: 'c', date: '2026-08-24' }] }) };
     }
     return { ok: true, status: 200, json: async () => ({}) };
   });
@@ -92,6 +94,43 @@ test('syncWindsor reports one tab as failed without affecting the other two', as
     assert.match(result.Creatives.error, /Windsor API error \(500\)/);
     assert.strictEqual(result.GoogleDaily.ok, true);
     assert.strictEqual(result.MetaDaily.ok, true);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('syncWindsor requests a date window ending yesterday, not today', async () => {
+  const originalFetch = global.fetch;
+  let capturedDateTo;
+  global.fetch = mock.fn(async (url) => {
+    if (String(url).includes('oauth2.googleapis.com/token')) return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
+    if (String(url).includes('connectors.windsor.ai')) {
+      capturedDateTo = new URL(String(url)).searchParams.get('date_to');
+      return { ok: true, status: 200, json: async () => ({ data: [{ campaign: 'c', date: '2026-08-24' }] }) };
+    }
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  try {
+    await syncWindsor(ENV);
+    const expectedYesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    assert.strictEqual(capturedDateTo, expectedYesterday);
+    assert.notStrictEqual(capturedDateTo, today);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('syncWindsor throws a descriptive error naming missing required env vars, before any network call', async () => {
+  const originalFetch = global.fetch;
+  const fetchMock = mock.fn(async () => { throw new Error('should not be called'); });
+  global.fetch = fetchMock;
+  try {
+    await assert.rejects(
+      () => syncWindsor({ WINDSOR_API_KEY: 'wkey', GOOGLE_SHEET_ID: 'SHEET_ID' }),
+      /Missing required environment variable\(s\): GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_KEY/
+    );
+    assert.strictEqual(fetchMock.mock.calls.length, 0);
   } finally {
     global.fetch = originalFetch;
   }

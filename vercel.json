@@ -4,5 +4,8 @@
   ],
   "crons": [
     { "path": "/api/sync-windsor", "schedule": "0 6 * * *" }
-  ]
+  ],
+  "functions": {
+    "api/sync-windsor.js": { "maxDuration": 60 }
+  }
 }

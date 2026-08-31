@@ -7,8 +7,9 @@ const { mapCreativesRows, mapGoogleDailyRows, mapMetaDailyRows } = require('../l
 const FACEBOOK_ACCOUNT_ID = '732629205086';
 const GOOGLE_ADS_ACCOUNT_ID = '779-598-7920';
 const WINDOW_DAYS = 90;
+const REQUIRED_ENV_VARS = ['WINDSOR_API_KEY', 'GOOGLE_SHEET_ID', 'GOOGLE_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_SERVICE_ACCOUNT_KEY'];
 
-function toIsoDate(d) {
+function isoDay(d) {
   return d.toISOString().slice(0, 10);
 }
 
@@ -16,11 +17,19 @@ function dateRange(days, referenceDate = new Date()) {
   const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()));
   const start = new Date(end);
   start.setUTCDate(start.getUTCDate() - (days - 1));
-  return { dateFrom: toIsoDate(start), dateTo: toIsoDate(end) };
+  return { dateFrom: isoDay(start), dateTo: isoDay(end) };
 }
 
 async function syncWindsor(env) {
-  const { dateFrom, dateTo } = dateRange(WINDOW_DAYS);
+  const missing = REQUIRED_ENV_VARS.filter((key) => !env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variable(s): ${missing.join(', ')}`);
+  }
+
+  // End the window at yesterday, not today — today is a partial day whose near-zero metrics
+  // would otherwise distort the most recent point on any daily chart built from this data.
+  const yesterday = new Date(Date.now() - 86400000);
+  const { dateFrom, dateTo } = dateRange(WINDOW_DAYS, yesterday);
   const accessToken = await getAccessToken({
     clientEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     privateKey: env.GOOGLE_SERVICE_ACCOUNT_KEY.replace(/\\n/g, '\n'),
@@ -54,17 +63,23 @@ async function syncWindsor(env) {
   ];
 
   const results = {};
-  for (const job of jobs) {
+  await Promise.all(jobs.map(async (job) => {
     try {
       const windsorRows = await job.fetch();
       const sheetRows = job.map(windsorRows);
-      await overwriteSheetRange({ accessToken, sheetId: env.GOOGLE_SHEET_ID, tabName: job.tab, rows: sheetRows });
+      await overwriteSheetRange({
+        accessToken,
+        sheetId: env.GOOGLE_SHEET_ID,
+        tabName: job.tab,
+        rows: sheetRows,
+        columnCount: sheetRows[0]?.length,
+      });
       results[job.tab] = { ok: true, rows: sheetRows.length };
     } catch (err) {
       console.error(`[sync-windsor] ${job.tab} failed:`, err);
       results[job.tab] = { ok: false, error: err.message };
     }
-  }
+  }));
   return results;
 }
 
