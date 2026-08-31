@@ -2316,7 +2316,9 @@ function renderBreakdownCard({ title, labelHeader, rows, cpaDecimals = 0, boldRo
   });
 
   if (boldRows) {
-    table = table.replace(/<tr>/g, '<tr class="tot">');
+    // Lookahead restricts this to body rows (followed by <td>), not the
+    // <thead> row (followed by <th>) — a global /<tr>/g would bold the header too.
+    table = table.replace(/<tr>(?=<td)/g, '<tr class="tot">');
   }
 
   return `<div><h3>${title}</h3><div class="card">${table}</div></div>`;
