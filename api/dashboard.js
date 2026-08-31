@@ -121,17 +121,37 @@ async function buildDashboardHtml(env) {
   const provenCount = data.filter((ad) => ad.status === 'PROVEN').length;
   const inProvenCount = data.filter((ad) => ad.in_proven).length;
 
-  const kpiTop = creatives.ok
+  // MER/spend/sales cards need Shopify+Meta+Google day-level data all to be present —
+  // computing them against a partially-0 source (e.g. Shopify down, Meta/Google fine)
+  // would silently produce a wrong number decorated with a misleading delta arrow.
+  const dayLevelOk = shopifyDaily.ok && metaDaily.ok && googleDaily.ok;
+  // CAC additionally needs the new-vs-returning source for its denominator.
+  const cacOk = metaDaily.ok && googleDaily.ok && newReturning.ok;
+  const kpiRowNeeded = dayLevelOk || cacOk || creatives.ok;
+
+  const kpiTop = kpiRowNeeded
     ? renderKpiRow([
-        { icon: '◐ BLENDED · last 30d', big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) },
-        { icon: 'ⓕ META · last 30d', big: formatMoneyK(metaSpend), cap: 'Spend', chg: deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) },
-        { icon: 'Ⓖ GOOGLE · last 30d', big: formatMoneyK(googleSpend), cap: 'Cost', chg: deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) },
-        { icon: '🛍 SHOPIFY · last 30d', big: formatMoneyK(shopifySales), cap: 'Total sales', chg: deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) },
-        { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 60d)' },
-        {
-          icon: '✅ PROVEN', big: String(provenCount), bigColor: '#1E8A4C',
-          cap: `${inProvenCount} in Proven campaign · ${provenCount - inProvenCount} ready to move`,
-        },
+        dayLevelOk
+          ? { icon: '◐ BLENDED · last 30d', big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) }
+          : { icon: '◐ BLENDED · last 30d', big: '—', cap: 'ROAS / MER — data unavailable' },
+        dayLevelOk
+          ? { icon: 'ⓕ META · last 30d', big: formatMoneyK(metaSpend), cap: 'Spend', chg: deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
+          : { icon: 'ⓕ META · last 30d', big: '—', cap: 'Spend — data unavailable' },
+        dayLevelOk
+          ? { icon: 'Ⓖ GOOGLE · last 30d', big: formatMoneyK(googleSpend), cap: 'Cost', chg: deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
+          : { icon: 'Ⓖ GOOGLE · last 30d', big: '—', cap: 'Cost — data unavailable' },
+        dayLevelOk
+          ? { icon: '🛍 SHOPIFY · last 30d', big: formatMoneyK(shopifySales), cap: 'Total sales', chg: deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) }
+          : { icon: '🛍 SHOPIFY · last 30d', big: '—', cap: 'Total sales — data unavailable' },
+        cacOk
+          ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 60d)' }
+          : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
+        creatives.ok
+          ? {
+              icon: '✅ PROVEN', big: String(provenCount), bigColor: '#1E8A4C',
+              cap: `${inProvenCount} in Proven campaign · ${provenCount - inProvenCount} ready to move`,
+            }
+          : { icon: '✅ PROVEN', big: '—', cap: 'Creatives data unavailable' },
       ])
     : unavailableNote('KPI');
 

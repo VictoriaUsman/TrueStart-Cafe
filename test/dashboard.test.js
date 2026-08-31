@@ -87,6 +87,46 @@ test('a blank/malformed date row in one Sheet tab does not crash the whole page'
   }
 });
 
+test('a single day-level source failure (Google) blanks the MER/spend/sales KPI cards instead of computing a silently-wrong number with a misleading up-arrow', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async (url) => {
+    if (url === ENV.SHEET_CSV_URL_GOOGLE_DAILY) return { ok: false, status: 500, text: async () => '' };
+    if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
+    return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };
+  });
+  try {
+    const html = await buildDashboardHtml(ENV);
+    // MER/spend/sales cards fall back to '—' rather than computing MER against a 0 Google cost
+    // (which would otherwise inflate MER and could show a misleading green up-arrow).
+    assert.match(html, /ROAS \/ MER — data unavailable/);
+    assert.match(html, /Spend — data unavailable/);
+    assert.doesNotMatch(html, /class="chg up"/);
+    // The PROVEN card is independent of the day-level sources and should still render for real.
+    assert.match(html, /✅ PROVEN/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('the KPI row still renders (with per-card fallbacks) when creatives fails but day-level sources succeed', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async (url) => {
+    if (url === ENV.SHEET_CSV_URL_CREATIVES) return { ok: false, status: 500, text: async () => '' };
+    if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
+    return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };
+  });
+  try {
+    const html = await buildDashboardHtml(ENV);
+    // Real numbers for the day-level cards, since Shopify/Meta/Google all succeeded.
+    assert.match(html, /class="kpis">/);
+    assert.doesNotMatch(html, /ROAS \/ MER — data unavailable/);
+    // PROVEN card falls back since creatives failed.
+    assert.match(html, /Creatives data unavailable/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('degrades only the Stock section when the Shopify API call fails', async () => {
   const originalFetch = global.fetch;
   global.fetch = mock.fn(async (url) => {
