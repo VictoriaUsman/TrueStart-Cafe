@@ -172,9 +172,13 @@ async function buildDashboardHtml(env) {
 
   const { RS, LB } = buildDailyRoasSeries({ shopifyDailyRows: shopifyDaily.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows });
 
+  const cacChart =
+    '<div class="note" style="font-size:12.5px">Monthly CAC trend is not yet available — it needs a month-by-month ' +
+    'new-customer breakdown this Sheet does not currently provide.</div>';
+
   return injectDashboard(
     {
-      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab,
+      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart,
       // Plain text (not unavailableNote's <div>) because this is injected inside an inline <span> in
       // the template; phrasing still matches "{label} data is temporarily unavailable" for consistency
       // with the other sections' degraded-state copy.

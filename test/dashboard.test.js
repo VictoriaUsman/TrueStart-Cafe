@@ -44,6 +44,9 @@ test('builds a full HTML page when every source succeeds', async () => {
     assert.match(html, /BOF_ST_19_Upgrader_Price_Starter_Bags V1/); // DATA literal present
     assert.doesNotMatch(html, /<!--INJECT:/);
     assert.doesNotMatch(html, /\/\*INJECT:/);
+    // The static, fabricated CAC monthly bar chart must be replaced with an honest placeholder note.
+    assert.match(html, /Monthly CAC trend is not yet available/);
+    assert.doesNotMatch(html, /£40\.83/);
   } finally {
     global.fetch = originalFetch;
   }

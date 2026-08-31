@@ -13,6 +13,7 @@ const SECTIONS = {
   cohortTable: '<table>COHORT</table>',
   subscriptionTab: '<div>SUBS</div>',
   stockStatus: 'live · fetched now',
+  cacChart: '<div class="note">CAC_CHART_PLACEHOLDER</div>',
 };
 const LITERALS = {
   DATA: [{ name: 'Ad 1' }],
@@ -25,7 +26,15 @@ test('replaces every HTML comment marker with its section HTML', () => {
   const html = injectDashboard(SECTIONS, LITERALS);
   assert.match(html, /<div class="kpis">TOP<\/div>/);
   assert.match(html, /<div>GOOGLE<\/div>/);
+  assert.match(html, /<div class="note">CAC_CHART_PLACEHOLDER<\/div>/);
   assert.doesNotMatch(html, /<!--INJECT:/);
+});
+
+test('the static, fabricated CAC bar chart (May £40.83/June £24.34/July £22.18) no longer ships in the template', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  assert.doesNotMatch(original, /£40\.83/);
+  assert.doesNotMatch(original, /down ~46% since May/);
+  assert.match(original, /<!--INJECT:CAC_CHART-->/);
 });
 
 test('replaces every script literal marker with valid, equivalent JSON', () => {
