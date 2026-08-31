@@ -459,10 +459,13 @@ Expected: FAIL with "Cannot find module '../../lib/transform/stage'"
 ```js
 // lib/transform/stage.js
 
+// Note: \b treats underscore as a word character, so /\bTOF\b/ would never
+// match inside "K-TS_UK_TOF_Awareness" (no boundary between "_" and "T").
+// Use negative lookbehind/lookahead against letters instead.
 function getFunnelStage(campaignName) {
-  if (/\bTOF\b/i.test(campaignName)) return 'TOF';
-  if (/\bMOF\b/i.test(campaignName)) return 'MOF';
-  if (/\bBOF\b/i.test(campaignName)) return 'BOF';
+  if (/(?<![a-zA-Z])TOF(?![a-zA-Z])/i.test(campaignName)) return 'TOF';
+  if (/(?<![a-zA-Z])MOF(?![a-zA-Z])/i.test(campaignName)) return 'MOF';
+  if (/(?<![a-zA-Z])BOF(?![a-zA-Z])/i.test(campaignName)) return 'BOF';
   return 'Other';
 }
 
