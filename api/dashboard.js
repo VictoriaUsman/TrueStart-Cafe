@@ -120,7 +120,13 @@ async function buildDashboardHtml(env) {
     },
     { newCustomers: 0, returningCustomers: 0 }
   );
-  const cacValue = cac({ metaSpend, googleSpend, newCustomers: newReturningTotals.newCustomers });
+  // The new-vs-returning source is synced over a 90-day trailing window (sync-shopify.js's
+  // WINDOW_DAYS) — CAC's spend must be summed over that same window, not the 30-day KPI window,
+  // or the ratio's two halves refer to different periods (30d spend ÷ 90d customers).
+  const cacWindow = windowBounds(anchorDate, 90);
+  const cacMetaSpend = sumInWindow(metaDaily.rows, { dateKey: 'Day', valueKey: 'Amount spent (GBP)', start: cacWindow.start, end: cacWindow.end });
+  const cacGoogleSpend = sumInWindow(googleDaily.rows, { dateKey: 'Day', valueKey: 'Cost', start: cacWindow.start, end: cacWindow.end });
+  const cacValue = cac({ metaSpend: cacMetaSpend, googleSpend: cacGoogleSpend, newCustomers: newReturningTotals.newCustomers });
 
   const provenCount = data.filter((ad) => ad.status === 'PROVEN').length;
   const inProvenCount = data.filter((ad) => ad.in_proven).length;
@@ -148,7 +154,7 @@ async function buildDashboardHtml(env) {
           ? { icon: '🛍 SHOPIFY · last 30d', big: formatMoneyK(shopifySales), cap: 'Total sales', chg: deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) }
           : { icon: '🛍 SHOPIFY · last 30d', big: '—', cap: 'Total sales — data unavailable' },
         cacOk
-          ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 60d)' }
+          ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 90d)' }
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
         creatives.ok
           ? {

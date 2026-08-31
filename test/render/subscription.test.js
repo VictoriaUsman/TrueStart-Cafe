@@ -10,6 +10,12 @@ test('renders AOV and new-customer-share KPI cards', () => {
   assert.match(html, /5,088 new of 8,134/);
 });
 
+test('labels the new-customer-share caption and new-vs-returning table with the real 90d window, not the stale 60d one', () => {
+  const html = renderSubscriptionTab({ aov: 19.37, newCustomers: 5088, returningCustomers: 3046 });
+  assert.match(html, /\(last 90d\)/);
+  assert.doesNotMatch(html, /60d/);
+});
+
 test('renders the new-vs-returning table with counts and shares', () => {
   const html = renderSubscriptionTab({ aov: 19.37, newCustomers: 5088, returningCustomers: 3046 });
   assert.match(html, /New customer/);

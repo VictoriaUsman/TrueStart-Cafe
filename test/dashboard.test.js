@@ -60,6 +60,20 @@ test('builds a full HTML page when every source succeeds', async () => {
   }
 });
 
+test('the CAC KPI card sums spend over the same 90-day window as the new-vs-returning source, not the 30-day KPI window', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchAllOk();
+  try {
+    const html = await buildDashboardHtml(ENV);
+    // Meta+Google spend across BOTH the Aug 1 row (inside the 30d window) and the Jun 15 row
+    // (outside 30d, inside 90d) = (100+3000) + (100+1000) = 4200; 4200 / 5000 new customers = £0.84 -> £1.
+    // The old 30d-only calc would give (100+100)/5000 = £0.04 -> £0.
+    assert.match(html, /💷 CAC · cost per new customer<\/div><div class="big">£1<\/div><div class="cap">blended · Meta\+Google ÷ new customers \(last 90d\)/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('degrades the Monthly CAC trend chart when its Sheet tab fails, leaving other sections intact', async () => {
   const originalFetch = global.fetch;
   global.fetch = mock.fn(async (url) => {
