@@ -43,10 +43,12 @@
   "type": "commonjs",
   "engines": { "node": ">=18" },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test \"test/**/*.test.js\""
   }
 }
 ```
+
+**Ruling (recorded during Task 1 execution):** `node --test test/` (a bare directory, with or without trailing slash) fails with `MODULE_NOT_FOUND` on this Node version/platform instead of recursively discovering tests — verified empirically, both empty and with nested test files present. The quoted glob `"test/**/*.test.js"` was verified to work correctly in all three cases (empty, flat files, nested files) via both `node --test` directly and `npm test`. Use the glob form everywhere a whole-suite run is needed (this task's `package.json` and Task 27 Step 2); per-task steps that name one explicit test file (e.g. `node --test test/csv.test.js`) are unaffected and unchanged.
 
 - [ ] **Step 2: Create `.gitignore`**
 
@@ -3224,7 +3226,7 @@ git commit -m "Add dashboard orchestration handler wiring all sources and sectio
 
 - [ ] **Step 2: Run the full test suite one final time**
 
-Run: `npm test`
+Run: `npm test` (runs `node --test "test/**/*.test.js"` per the Task 1 ruling)
 Expected: all tests across every task pass, 0 failures.
 
 - [ ] **Step 3: Commit**
