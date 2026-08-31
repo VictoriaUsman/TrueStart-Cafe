@@ -1817,30 +1817,18 @@ Expected: FAIL with "Cannot find module '../../lib/render/google'"
 
 - [ ] **Step 3: Write the implementation**
 
+**Ruling (recorded during Task 17 execution):** the code below originally rendered the Type column via a `typeCell()` helper that built a small colored-dot `<span>` as raw HTML. That's incompatible with `renderTable` (Task 13), which unconditionally HTML-escapes every cell value — the raw `<span>` markup would come out double-escaped as visible broken text, not a colored dot. `renderTable`'s escaping is a deliberately tested security invariant (its own XSS test) and is not to be weakened for a cosmetic nicety. Ruling: drop the colored dot, render the Type column as plain text. The type label itself (e.g. "PMax", "Search · brand") is unaffected — only the small decorative square is lost. Cost if wrong: purely cosmetic, trivially reversible later (e.g. via a CSS `:contains`-free approach or a dedicated non-escaped column type in `renderTable`, should a future task want the dot back).
+
 ```js
 // lib/render/google.js
 const { renderKpiRow } = require('./kpis');
 const { renderTable } = require('./table');
 const { formatMoney, formatMoneyK, formatNumber, formatPercent } = require('./format');
 
-const TYPE_COLOR = {
-  'PMax': '#4a90c2',
-  'Search · non-brand': '#2b6cb0',
-  'Search · brand': '#1f5f8b',
-  'Shopping': '#7cc4e8',
-  'Display': '#8a8a8a',
-  'Other': '#8a8a8a',
-};
-
-function typeCell(type) {
-  const color = TYPE_COLOR[type] || TYPE_COLOR.Other;
-  return `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};margin-right:6px"></span>${type}`;
-}
-
 function toTableRow(r) {
   return {
     campaign: r.campaign,
-    type: typeCell(r.type),
+    type: r.type,
     cost: formatMoney(r.cost),
     impr: formatNumber(r.impr),
     clicks: formatNumber(r.clicks),
