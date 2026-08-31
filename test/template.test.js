@@ -48,6 +48,15 @@ test('throws a descriptive error if a marker is missing from the template (templ
   assert.match(original, /<!--INJECT:KPI_TOP-->/, 'template.html must still contain the KPI_TOP marker for this test to be meaningful');
 });
 
+test('stkLoad/stkBoot guard against a falsy STK_SNAP.asOf (Shopify outage marker) instead of rendering a false all-clear', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  // stkLoad must not overwrite the server-rendered #st_status text when there is no real snapshot.
+  assert.match(original, /if\(!\(STK_SNAP&&STK_SNAP\.asOf\)\) return;/);
+  // stkBoot must not call stkRender (which would print "No advertised products are OOS or low
+  // right now." for an empty array) on an outage — it should show an explicit unavailable state.
+  assert.match(original, /Stock data is temporarily unavailable — please refresh shortly\.<\/div>/);
+});
+
 test('escapes "</script>" inside an injected literal so it cannot break out of the script tag', () => {
   const html = injectDashboard(SECTIONS, {
     ...LITERALS,

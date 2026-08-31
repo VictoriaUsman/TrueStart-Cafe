@@ -81,7 +81,10 @@ async function buildDashboardHtml(env) {
       .then((snap) => ({ ok: true, snap }))
       .catch((err) => {
         console.error('[dashboard] Shopify inventory fetch failed:', err);
-        return { ok: false, snap: { asOf: new Date().toISOString(), products: [] } };
+        // asOf: null is a marker never produced by a real successful fetch — the client
+        // script uses it to distinguish "outage" from "all clear" instead of rendering
+        // an empty products array as a false all-clear.
+        return { ok: false, snap: { asOf: null, products: [] } };
       }),
   ]);
 
@@ -177,7 +180,7 @@ async function buildDashboardHtml(env) {
       // with the other sections' degraded-state copy.
       stockStatus: stock.ok ? `live · fetched ${new Date(stock.snap.asOf).toLocaleString('en-GB')}` : 'Stock data is temporarily unavailable — please refresh shortly.',
     },
-    { DATA: data, RS, LB, STK_SNAP: stock.ok ? stock.snap : { asOf: new Date().toISOString(), products: [] } }
+    { DATA: data, RS, LB, STK_SNAP: stock.snap }
   );
 }
 

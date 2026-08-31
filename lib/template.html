@@ -166,6 +166,7 @@ function stkRender(prods){
 }
 async function stkLoad(){
   var st=document.getElementById('st_status');
+  if(!(STK_SNAP&&STK_SNAP.asOf)) return; // outage marker: leave server-rendered #st_status text alone
   if(!(window.cowork&&window.cowork.callMcpTool)){if(st)st.textContent='live · fetched '+new Date(STK_SNAP.asOf).toLocaleString('en-GB');return;}
   try{
     if(st)st.textContent='refreshing live from Shopify…';
@@ -176,7 +177,17 @@ async function stkLoad(){
     if(st)st.textContent='live · '+new Date().toLocaleString('en-GB');
   }catch(e){if(st)st.textContent='showing snapshot · '+STK_SNAP.asOf+' (live refresh unavailable: '+(e&&e.message?e.message:e)+')';}
 }
-function stkBoot(){ try{ stkRender((STK_SNAP&&STK_SNAP.products)||[]); }catch(e){} stkLoad(); }
+function stkBoot(){
+  if(!(STK_SNAP&&STK_SNAP.asOf)){
+    ['st_oos','st_low','st_adv'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent='—';});
+    var box=document.getElementById('st_advbox');
+    if(box)box.innerHTML='<div class="note" style="font-size:12px">Stock data is temporarily unavailable — please refresh shortly.</div>';
+    var tb=document.getElementById('st_tb');
+    if(tb)tb.innerHTML='<tr><td colspan="6" style="padding:16px;color:#9aa0aa">Stock data is temporarily unavailable.</td></tr>';
+    return;
+  }
+  try{ stkRender((STK_SNAP&&STK_SNAP.products)||[]); }catch(e){} stkLoad();
+}
 var _stThr=document.getElementById('st_thr');
 if(_stThr){_stThr.value=stkThr();_stThr.addEventListener('change',function(e){try{localStorage.setItem('ts_thr',e.target.value);}catch(_){} stkBoot();});}
 stkBoot();

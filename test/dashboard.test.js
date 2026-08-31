@@ -94,6 +94,10 @@ test('degrades only the Stock section when the Shopify API call fails', async ()
     const html = await buildDashboardHtml(ENV);
     assert.match(html, /Stock.*data is temporarily unavailable/is);
     assert.match(html, /const RS=\[/); // performance chart still built
+    // The injected STK_SNAP must carry a distinguishing "outage" marker (asOf: null) —
+    // never asOf: <now> with an empty products array, which the client script would
+    // otherwise render as a false "all clear".
+    assert.match(html, /var STK_SNAP=\{"asOf":null,"products":\[\]\};/);
   } finally {
     global.fetch = originalFetch;
   }
