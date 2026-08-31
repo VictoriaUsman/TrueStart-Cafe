@@ -3179,7 +3179,7 @@ async function buildDashboardHtml(env) {
   return injectDashboard(
     {
       kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab,
-      stockStatus: stock.ok ? `live · fetched ${new Date(stock.snap.asOf).toLocaleString('en-GB')}` : 'stock data temporarily unavailable',
+      stockStatus: stock.ok ? `live · fetched ${new Date(stock.snap.asOf).toLocaleString('en-GB')}` : 'Stock data is temporarily unavailable — please refresh shortly.',
     },
     { DATA: data, RS, LB, STK_SNAP: stock.ok ? stock.snap : { asOf: new Date().toISOString(), products: [] } }
   );
