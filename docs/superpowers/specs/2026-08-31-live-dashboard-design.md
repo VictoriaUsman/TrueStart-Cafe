@@ -26,6 +26,8 @@ The Sheet itself is kept fresh by Windsor.ai (Meta/Google) and Shopify exports o
 6. **Cohort retention** — `Month, Months since first purchase, Customers, Customer retention rate, Customers in cohort`
 7. **AOV daily comparison** — `Day, Gross sales, Discounts, Orders, Average order value` + previous-period columns
 
+The current static file's "Cumulative LTV (blended)" table (£ value by month-since-first-order) also has no corresponding source in the Sheet — only retention *rate* (Cohort tab) and AOV are available, not blended £ LTV. Per the same placeholder policy as Section 2.3, this table stays static/placeholder rather than being approximated.
+
 No subscription/Recharge data exists in the Sheet yet — the Subscription & LTV tab's subscriber-specific metrics (active subscribers, taster→subscribe rate) remain a "coming soon" placeholder note, same as the current static file.
 
 ### 2.2 Meta campaigns tab has a sub-feature deferred out of this iteration
@@ -125,6 +127,7 @@ Public, unlisted Vercel URL. No authentication layer. Relies on the URL not bein
 ## 11. Explicitly out of scope for this iteration
 
 - Subscriber-level Recharge metrics (active subscribers, taster→subscribe rate, subscription LTV) — stays a placeholder note.
+- "Cumulative LTV (blended)" £-by-month table — no source in the Sheet; stays a placeholder note (see Section 2.1 note).
 - Meta campaigns tab's "Campaign view / Action items" sub-feature (collapsible per-campaign ad breakdown, graduate/archive/duplicate-cleanup recommendations) — stays a static "coming soon" note (see Section 2.2).
 - Monthly CAC trend / "Cost per new customer" bar chart — stays a static placeholder note; CAC KPI card shows one trailing-window figure instead (see Section 2.3).
 - Any authentication/access control beyond an unlisted URL.
