@@ -56,3 +56,20 @@ test('getAccessToken throws a descriptive error when Google rejects the assertio
     global.fetch = originalFetch;
   }
 });
+
+test('getAccessToken throws a descriptive error on a non-2xx HTTP response, without parsing the body', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async () => ({
+    ok: false,
+    status: 500,
+    json: async () => { throw new Error('json() should not be called when res.ok is false'); },
+  }));
+  try {
+    await assert.rejects(
+      () => getAccessToken({ clientEmail: 'x@example.com', privateKey }),
+      /Google auth request failed \(500\)/
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
