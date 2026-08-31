@@ -48,9 +48,12 @@ test('builds a full HTML page when every source succeeds', async () => {
     assert.doesNotMatch(html, /\/\*INJECT:/);
     // Real monthly CAC chart: June is a complete month with matching spend+new-customer data,
     // so it renders as a bar (£4000 spend ÷ 200 new customers = £20.00 CAC). August is the
-    // current in-progress month (matches the anchor date) and must be excluded.
+    // current in-progress month (matches the anchor date) and renders too, but flagged partial
+    // (£200 spend ÷ 50 new customers = £4.00 CAC).
     assert.match(html, /£20\.00/);
     assert.match(html, />June</);
+    assert.match(html, /£4\.00/);
+    assert.match(html, />August \(to date\)</);
     assert.doesNotMatch(html, /Monthly CAC trend is not yet available/);
   } finally {
     global.fetch = originalFetch;
@@ -73,12 +76,30 @@ test('degrades the Monthly CAC trend chart when its Sheet tab fails, leaving oth
   }
 });
 
-test('shows a graceful "not enough data" note instead of a chart when no month is complete yet', async () => {
+test('shows a partial "(to date)" bar rather than excluding it, when only the current month has data', async () => {
   const originalFetch = global.fetch;
   global.fetch = mock.fn(async (url) => {
-    // Only the current in-progress month has data — it gets excluded, leaving nothing to chart.
     if (url === ENV.SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY) {
       return { ok: true, status: 200, text: async () => 'Month,New customers,Returning customers\n2026-08-01,50,20\n' };
+    }
+    if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
+    return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };
+  });
+  try {
+    const html = await buildDashboardHtml(ENV);
+    assert.doesNotMatch(html, /not enough/i);
+    assert.match(html, />August \(to date\)</);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('shows a graceful "not enough data" note instead of a chart when there is no usable month at all', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async (url) => {
+    // 0 new customers is the only row — skipped by buildMonthlyCacSeries, leaving nothing to chart.
+    if (url === ENV.SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY) {
+      return { ok: true, status: 200, text: async () => 'Month,New customers,Returning customers\n2026-08-01,0,20\n' };
     }
     if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
     return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };

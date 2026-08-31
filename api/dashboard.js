@@ -197,11 +197,11 @@ async function buildDashboardHtml(env) {
   const { RS, LB } = buildDailyRoasSeries({ shopifyDailyRows: shopifyDaily.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows });
 
   // The month containing the anchor date is still in progress (synced daily, not a full calendar
-  // month yet) — excluded so its partial spend/customer count doesn't distort the newest bar.
+  // month yet) — included but flagged so renderCacChart can mark its bar as partial/to-date.
   const anchorMonth = anchorDate.slice(0, 7);
   const cacChart = metaDaily.ok && googleDaily.ok && cacMonthly.ok
     ? renderCacChart(buildMonthlyCacSeries({
-        monthlyRows: cacMonthly.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows, excludeMonth: anchorMonth,
+        monthlyRows: cacMonthly.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows, currentMonth: anchorMonth,
       }))
     : unavailableNote('Monthly CAC trend');
 

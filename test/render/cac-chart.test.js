@@ -4,9 +4,9 @@ const assert = require('node:assert');
 const { renderCacChart } = require('../../lib/render/cac-chart');
 
 const SERIES = [
-  { month: '2026-05', label: 'May', cac: 40.83, spend: 57000, newCustomers: 1396 },
-  { month: '2026-06', label: 'June', cac: 24.34, spend: 70000, newCustomers: 2876 },
-  { month: '2026-07', label: 'July', cac: 22.18, spend: 44000, newCustomers: 1984 },
+  { month: '2026-05', label: 'May', cac: 40.83, spend: 57000, newCustomers: 1396, partial: false },
+  { month: '2026-06', label: 'June', cac: 24.34, spend: 70000, newCustomers: 2876, partial: false },
+  { month: '2026-07', label: 'July', cac: 22.18, spend: 44000, newCustomers: 1984, partial: false },
 ];
 
 test('renders one bar per month with its CAC value and month label visible', () => {
@@ -34,8 +34,22 @@ test('each bar carries a hover tooltip with month, CAC, spend, and new-customer 
   assert.match(html, /<title>May: £40\.83 CAC · £57\.0k spend · 1,396 new customers<\/title>/);
 });
 
-test('renders a graceful note instead of an empty chart when there are no complete months yet', () => {
+test('renders a graceful note instead of an empty chart when there is no data at all', () => {
   const html = renderCacChart([]);
   assert.doesNotMatch(html, /<svg/);
   assert.match(html, /not enough/i);
+});
+
+test('a partial (current, still-in-progress) month renders with a distinct visual treatment and "to date" labelling', () => {
+  const html = renderCacChart([
+    { month: '2026-05', label: 'May', cac: 40.83, spend: 57000, newCustomers: 1396, partial: false },
+    { month: '2026-08', label: 'August', cac: 4, spend: 200, newCustomers: 50, partial: true },
+  ]);
+  // The partial bar is visually distinguished (dashed outline, reduced fill) from complete-month bars.
+  const partialRect = html.match(/<rect[^>]*stroke-dasharray[^>]*>/);
+  assert.ok(partialRect, 'expected a dashed rect for the partial month');
+  const completeRect = html.match(/<rect[^>]*>/);
+  assert.doesNotMatch(completeRect[0], /stroke-dasharray/);
+  assert.match(html, />August \(to date\)</);
+  assert.match(html, /<title>August \(month to date\): £4\.00 CAC · £200 spend · 50 new customers<\/title>/);
 });
