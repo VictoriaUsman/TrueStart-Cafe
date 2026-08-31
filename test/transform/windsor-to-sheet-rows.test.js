@@ -40,6 +40,14 @@ test('mapGoogleDailyRows defaults missing numeric fields to 0', () => {
   assert.deepStrictEqual(rows, [['L - PMax', '2026-08-24', 'GBP', 10, 0, 0, 0, 0]]);
 });
 
+test('mapGoogleDailyRows coerces string-typed numeric fields (and an empty string) to real numbers', () => {
+  const rows = mapGoogleDailyRows([{
+    campaign: 'L - PMax', date: '2026-08-24', currency: 'GBP', cost: '66.23',
+    impressions: '2000', clicks: '', conversions: 5, conversion_value: 250,
+  }]);
+  assert.deepStrictEqual(rows, [['L - PMax', '2026-08-24', 'GBP', 66.23, 2000, 0, 5, 250]]);
+});
+
 test('mapMetaDailyRows maps a full Windsor facebook daily row to the MetaDaily column order, using date for both reporting start and end', () => {
   const rows = mapMetaDailyRows([{
     campaign: 'K-TS_UK_BOF-PROVEN', date: '2026-08-24', impressions: 1000, spend: 100,
