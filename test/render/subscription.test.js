@@ -25,10 +25,21 @@ test('renders the new-vs-returning table with counts and shares', () => {
   assert.match(html, />3,046</);
 });
 
-test('renders a placeholder note instead of a fabricated Cumulative LTV table', () => {
-  const html = renderSubscriptionTab({ aov: 19.37, newCustomers: 5088, returningCustomers: 3046 });
+test('renders the real Cumulative LTV table when cohort data is available', () => {
+  const html = renderSubscriptionTab({
+    aov: 19.37, newCustomers: 5088, returningCustomers: 3046,
+    ltvRows: [{ cohortLabel: 'May 2026', size: 1000, months: [20, 24, null, null, null, null, null, null, null, null, null, null, null] }],
+  });
   assert.match(html, /Cumulative LTV/);
-  assert.match(html, /not yet available/i);
+  assert.match(html, /May 2026/);
+  assert.match(html, />£20</);
+  assert.doesNotMatch(html, /not yet available/i);
+});
+
+test('renders a graceful note instead of a Cumulative LTV table when there is no cohort data yet', () => {
+  const html = renderSubscriptionTab({ aov: 19.37, newCustomers: 5088, returningCustomers: 3046, ltvRows: [] });
+  assert.match(html, /Cumulative LTV/);
+  assert.match(html, /not enough/i);
 });
 
 test('renders the existing subscriber-metrics placeholder note', () => {

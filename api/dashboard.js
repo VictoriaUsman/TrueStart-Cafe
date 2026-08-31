@@ -9,6 +9,7 @@ const { buildGoogleCampaignRows } = require('../lib/transform/google-campaigns')
 const { buildFunnelSplit, buildStatusSpend } = require('../lib/transform/overview');
 const { buildBreakdown } = require('../lib/transform/breakdown');
 const { buildCohortTable } = require('../lib/transform/cohort');
+const { buildLtvTable } = require('../lib/transform/ltv');
 const { buildMonthlyCacSeries } = require('../lib/transform/monthly-cac');
 const { injectDashboard } = require('../lib/template');
 const { renderKpiRow } = require('../lib/render/kpis');
@@ -189,14 +190,20 @@ async function buildDashboardHtml(env) {
       )
     : unavailableNote('Pack & product');
 
-  const cohortTable = cohort.ok ? renderCohortTable(buildCohortTable(cohort.rows)) : unavailableNote('Cohort');
+  // Computed once and reused by both the Cohort tab and the Subscription tab's Cumulative LTV
+  // estimate (retention rate × AOV), so the two sections can never disagree on cohort shape.
+  const cohortTableData = cohort.ok ? buildCohortTable(cohort.rows) : [];
+  const cohortTable = cohort.ok ? renderCohortTable(cohortTableData) : unavailableNote('Cohort');
+
+  const aov = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Net sales', start, end }) /
+    (sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Orders', start, end }) || 1);
 
   const subscriptionTab = shopifyDaily.ok && newReturning.ok
     ? renderSubscriptionTab({
-        aov: sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Net sales', start, end }) /
-          (sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Orders', start, end }) || 1),
+        aov,
         newCustomers: newReturningTotals.newCustomers,
         returningCustomers: newReturningTotals.returningCustomers,
+        ltvRows: cohort.ok ? buildLtvTable(cohortTableData, aov) : [],
       })
     : unavailableNote('Subscription & LTV');
 

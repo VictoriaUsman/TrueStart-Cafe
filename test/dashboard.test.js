@@ -74,6 +74,37 @@ test('the CAC KPI card sums spend over the same 90-day window as the new-vs-retu
   }
 });
 
+test('renders a real Cumulative LTV table (estimated from Cohort retention rate × AOV), not the old static placeholder', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchAllOk();
+  try {
+    const html = await buildDashboardHtml(ENV);
+    // Jan 2026 cohort, M0 retention 100% (default) × £20 AOV (£1000 net sales / 50 orders) = £20.
+    assert.match(html, /Jan 2026/);
+    assert.match(html, />£20</);
+    assert.doesNotMatch(html, /Cumulative LTV.{0,20}is not yet available/s);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('degrades only the Cumulative LTV table (graceful "not enough data" note) when the Cohort tab fails, leaving the rest of the Subscription tab intact', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async (url) => {
+    if (url === ENV.SHEET_CSV_URL_COHORT) return { ok: false, status: 500, text: async () => '' };
+    if (CSV_BY_URL[url] !== undefined) return { ok: true, status: 200, text: async () => CSV_BY_URL[url] };
+    return { ok: true, status: 200, json: async () => ({ data: { products: { edges: [] } } }) };
+  });
+  try {
+    const html = await buildDashboardHtml(ENV);
+    assert.match(html, /Cumulative LTV/);
+    assert.match(html, /not enough/i);
+    assert.match(html, /£19\.\d\d|£20\.\d\d|AVG ORDER VALUE/); // rest of the Subscription tab still renders
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('degrades the Monthly CAC trend chart when its Sheet tab fails, leaving other sections intact', async () => {
   const originalFetch = global.fetch;
   global.fetch = mock.fn(async (url) => {
