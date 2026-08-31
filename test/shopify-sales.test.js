@@ -1,7 +1,7 @@
 // test/shopify-sales.test.js
 const { test, mock } = require('node:test');
 const assert = require('node:assert');
-const { fetchShopifySales } = require('../lib/shopify-sales');
+const { fetchShopifySales, fetchNewVsReturning } = require('../lib/shopify-sales');
 
 function fakeShopifyQlResponse(rows, parseErrors = []) {
   return {
@@ -67,6 +67,37 @@ test('fetchShopifySales throws a descriptive error on a GraphQL-level error resp
       () => fetchShopifySales({ shopDomain: 'test.myshopify.com', accessToken: 'bad', dateFrom: '2026-06-03', dateTo: '2026-08-30' }),
       /Shopify GraphQL error/
     );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('fetchNewVsReturning sends the right ShopifyQL query and returns new/returning counts', async () => {
+  const originalFetch = global.fetch;
+  let capturedBody;
+  global.fetch = mock.fn(async (url, opts) => {
+    capturedBody = JSON.parse(opts.body);
+    return {
+      ok: true, status: 200,
+      json: async () => ({ data: { shopifyqlQuery: { tableData: { rows: [{ new_customers: '6984', returning_customers: '3777' }] }, parseErrors: [] } } }),
+    };
+  });
+  try {
+    const result = await fetchNewVsReturning({ shopDomain: 'test.myshopify.com', accessToken: 'tok', dateFrom: '2026-06-03', dateTo: '2026-08-30' });
+    assert.deepStrictEqual(result, { newCustomers: 6984, returningCustomers: 3777 });
+    assert.match(capturedBody.variables.q, /SHOW new_customers, returning_customers/);
+    assert.match(capturedBody.variables.q, /SINCE 2026-06-03 UNTIL 2026-08-30/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('fetchNewVsReturning returns zeros when there is no data in range', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async () => ({ ok: true, status: 200, json: async () => ({ data: { shopifyqlQuery: { tableData: null, parseErrors: [] } } }) }));
+  try {
+    const result = await fetchNewVsReturning({ shopDomain: 'test.myshopify.com', accessToken: 'tok', dateFrom: '2026-06-03', dateTo: '2026-08-30' });
+    assert.deepStrictEqual(result, { newCustomers: 0, returningCustomers: 0 });
   } finally {
     global.fetch = originalFetch;
   }

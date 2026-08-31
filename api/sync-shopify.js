@@ -1,5 +1,5 @@
 // api/sync-shopify.js
-const { fetchShopifySales } = require('../lib/shopify-sales');
+const { fetchShopifySales, fetchNewVsReturning } = require('../lib/shopify-sales');
 const { getAccessToken } = require('../lib/google-sheets-auth');
 const { overwriteSheetRange } = require('../lib/google-sheets-writer');
 const { mapShopifySalesRows } = require('../lib/transform/shopify-sales-to-sheet-rows');
@@ -26,23 +26,41 @@ async function syncShopify(env) {
   const salesPromise = fetchShopifySales({
     shopDomain: env.SHOPIFY_SHOP_DOMAIN, accessToken: env.SHOPIFY_ACCESS_TOKEN, dateFrom, dateTo,
   });
+  const newVsReturningPromise = fetchNewVsReturning({
+    shopDomain: env.SHOPIFY_SHOP_DOMAIN, accessToken: env.SHOPIFY_ACCESS_TOKEN, dateFrom, dateTo,
+  });
 
   const results = {};
-  try {
-    const [accessToken, salesRows] = await Promise.all([tokenPromise, salesPromise]);
-    const sheetRows = mapShopifySalesRows(salesRows);
-    await overwriteSheetRange({
-      accessToken,
-      sheetId: env.GOOGLE_SHEET_ID,
-      tabName: 'ShopifyTotals',
-      rows: sheetRows,
-      columnCount: sheetRows[0]?.length,
-    });
-    results.ShopifyTotals = { ok: true, rows: sheetRows.length };
-  } catch (err) {
-    console.error('[sync-shopify] ShopifyTotals failed:', err);
-    results.ShopifyTotals = { ok: false, error: err.message };
-  }
+  await Promise.all([
+    (async () => {
+      try {
+        const [accessToken, salesRows] = await Promise.all([tokenPromise, salesPromise]);
+        const sheetRows = mapShopifySalesRows(salesRows);
+        await overwriteSheetRange({
+          accessToken, sheetId: env.GOOGLE_SHEET_ID, tabName: 'ShopifyTotals',
+          rows: sheetRows, columnCount: sheetRows[0]?.length,
+        });
+        results.ShopifyTotals = { ok: true, rows: sheetRows.length };
+      } catch (err) {
+        console.error('[sync-shopify] ShopifyTotals failed:', err);
+        results.ShopifyTotals = { ok: false, error: err.message };
+      }
+    })(),
+    (async () => {
+      try {
+        const [accessToken, counts] = await Promise.all([tokenPromise, newVsReturningPromise]);
+        const sheetRows = [['New', counts.newCustomers], ['Returning', counts.returningCustomers]];
+        await overwriteSheetRange({
+          accessToken, sheetId: env.GOOGLE_SHEET_ID, tabName: 'ShopifyNewVsReturning',
+          rows: sheetRows, columnCount: 2,
+        });
+        results.ShopifyNewVsReturning = { ok: true, rows: sheetRows.length };
+      } catch (err) {
+        console.error('[sync-shopify] ShopifyNewVsReturning failed:', err);
+        results.ShopifyNewVsReturning = { ok: false, error: err.message };
+      }
+    })(),
+  ]);
   return results;
 }
 

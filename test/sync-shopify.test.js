@@ -50,6 +50,8 @@ test('syncShopify writes ShopifyTotals and reports rows written when everything 
     const result = await syncShopify(ENV);
     assert.strictEqual(result.ShopifyTotals.ok, true);
     assert.strictEqual(result.ShopifyTotals.rows, 1);
+    assert.strictEqual(result.ShopifyNewVsReturning.ok, true);
+    assert.strictEqual(result.ShopifyNewVsReturning.rows, 2);
   } finally {
     global.fetch = originalFetch;
   }
