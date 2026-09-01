@@ -42,8 +42,8 @@ function mockAll({ tokenOk = true, windsorOk = true, sheetsOk = true } = {}) {
         status: 200,
         json: async () => ({
           data: isGoogle
-            ? [{ campaign: 'L - Search - Brand', date: '2026-08-24', currency: 'GBP', cost: 10, impressions: 100, clicks: 5, conversions: 1, conversion_value: 40 }]
-            : [{ date_start: '2026-06-03', date_stop: '2026-08-31', ad_name: 'Ad 1', spend: 5, impressions: 50, campaign: 'Campaign', adset_name: 'Adset' }],
+            ? [{ campaign: 'L - Search - Brand', date: '2026-08-24', currency: 'GBP', cost: 10, impressions: 100, clicks: 5, conversions: 1, conversion_value: 40, account_id: '779-598-7920' }]
+            : [{ date_start: '2026-06-03', date_stop: '2026-08-31', ad_name: 'Ad 1', spend: 5, impressions: 50, campaign: 'Campaign', adset_name: 'Adset', account_id: '732629205086' }],
         }),
       };
     }
@@ -69,6 +69,39 @@ test('syncWindsor writes both tabs and reports rows written when everything succ
   }
 });
 
+// Regression test for the real incident: Windsor's google_ads connector returned a second
+// client's connected account (NBS, 652-880-9542) mixed in with ours even though the request only
+// asked for our own account_id — those rows must never reach the GoogleDaily sheet.
+test('syncWindsor excludes rows from other connected accounts on the same Windsor workspace (e.g. NBS)', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mock.fn(async (url) => {
+    if (String(url).includes('oauth2.googleapis.com/token')) return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
+    if (String(url).includes('/google_ads?')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            { campaign: 'L - Search - Brand', date: '2026-08-24', cost: 10, account_id: '779-598-7920' },
+            { campaign: 'US - Shopping - Dishwasher Parts', date: '2026-08-24', cost: 999, account_id: '652-880-9542' },
+          ],
+        }),
+      };
+    }
+    if (String(url).includes('connectors.windsor.ai')) {
+      return { ok: true, status: 200, json: async () => ({ data: [{ campaign: 'c', date: '2026-08-24', account_id: '732629205086' }] }) };
+    }
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  try {
+    const result = await syncWindsor(ENV);
+    assert.strictEqual(result.GoogleDaily.ok, true);
+    assert.strictEqual(result.GoogleDaily.rows, 1); // the NBS row is dropped before it's ever mapped/written
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('syncWindsor reports one tab as failed without affecting the other', async () => {
   const originalFetch = global.fetch;
   global.fetch = mock.fn(async (url, opts) => {
@@ -77,7 +110,7 @@ test('syncWindsor reports one tab as failed without affecting the other', async 
       return { ok: false, status: 500, json: async () => ({}) };
     }
     if (String(url).includes('connectors.windsor.ai')) {
-      return { ok: true, status: 200, json: async () => ({ data: [{ campaign: 'c', date: '2026-08-24' }] }) };
+      return { ok: true, status: 200, json: async () => ({ data: [{ campaign: 'c', date: '2026-08-24', account_id: '732629205086' }] }) };
     }
     return { ok: true, status: 200, json: async () => ({}) };
   });

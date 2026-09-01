@@ -90,7 +90,7 @@ test('the 6 bands tile the sheet contiguously and fit inside the live tab row ca
   );
 });
 
-const ONE_WINDSOR_AD = [{ ad_name: 'Ad 1', spend: 10, campaign: 'Camp A', adset_name: 'Adset A' }];
+const ONE_WINDSOR_AD = [{ ad_name: 'Ad 1', spend: 10, campaign: 'Camp A', adset_name: 'Adset A', account_id: '732629205086' }];
 
 function mockAll({ windsorOk = true, sheetsOk = true, windsorData = ONE_WINDSOR_AD } = {}) {
   return mock.fn(async (url, opts) => {
