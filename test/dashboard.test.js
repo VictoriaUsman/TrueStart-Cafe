@@ -239,7 +239,7 @@ test('the KPI row still renders (with per-card fallbacks) when creatives fails b
     assert.match(html, /class="kpis">/);
     assert.doesNotMatch(html, /ROAS \/ MER — data unavailable/);
     // PROVEN card falls back since creatives failed.
-    assert.match(html, /Creatives data unavailable/);
+    assert.match(html, /7-day qualification unavailable/);
   } finally {
     global.fetch = originalFetch;
   }

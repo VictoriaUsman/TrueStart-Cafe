@@ -14,10 +14,10 @@ test('TOF/MOF campaigns are always Feeder regardless of performance', () => {
   );
 });
 
-test('the dedicated Proven campaign is always PROVEN', () => {
+test('campaign naming does not establish seven-day qualification', () => {
   assert.strictEqual(
     getCreativeStatus({ campaignName: 'K-TS_UK_BOF-PROVEN', spend: 402.3, purchases: 19 }),
-    'PROVEN'
+    'TESTING'
   );
 });
 
@@ -28,14 +28,14 @@ test('near-zero spend in any other campaign is STARVED', () => {
   );
 });
 
-test('BOF Sales Retargeting: 20+ purchases is PROVEN', () => {
+test('historical purchase totals do not establish seven-day qualification', () => {
   assert.strictEqual(
     getCreativeStatus({ campaignName: 'K-TS_UK_BOF_Sales Retargeting', spend: 402.3, purchases: 19 }),
     'TESTING'
   );
   assert.strictEqual(
     getCreativeStatus({ campaignName: 'K-TS_UK_BOF_Sales Retargeting', spend: 402.3, purchases: 20 }),
-    'PROVEN'
+    'TESTING'
   );
 });
 

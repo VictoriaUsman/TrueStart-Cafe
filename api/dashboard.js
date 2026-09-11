@@ -1,5 +1,7 @@
 // api/dashboard.js
 const { fetchSheetTab } = require('../lib/sheets');
+const { readProvenSnapshot } = require('../lib/proven-snapshot');
+const { provenView } = require('../lib/render/proven');
 const { fetchLowStockSnapshot } = require('../lib/shopify');
 const { toIsoDate, formatShortLabel } = require('../lib/dates');
 const { buildCreativesData } = require('../lib/transform/creatives');
@@ -74,7 +76,7 @@ function deltaCaption(current, previous, { formatFn, direction }) {
 }
 
 async function buildDashboardHtml(env) {
-  const [creatives, googleDaily, metaDaily, shopifyDaily, newReturning, cohort, cacMonthly, stock] = await Promise.all([
+  const [creatives, googleDaily, metaDaily, shopifyDaily, newReturning, cohort, cacMonthly, stock, provenSnapshot] = await Promise.all([
     settleTab('Creatives', env.SHEET_CSV_URL_CREATIVES),
     settleTab('Google Ads', env.SHEET_CSV_URL_GOOGLE_DAILY),
     settleTab('Meta', env.SHEET_CSV_URL_META_DAILY),
@@ -91,7 +93,10 @@ async function buildDashboardHtml(env) {
         // an empty products array as a false all-clear.
         return { ok: false, snap: { asOf: null, products: [] } };
       }),
+    readProvenSnapshot(env).catch((err) => { console.error('[dashboard] Proven snapshot:', err.message); return null; }),
   ]);
+
+  const proven = provenView(provenSnapshot, new Date(), env.META_ACCOUNT_TIMEZONE || 'Europe/London');
 
   const data = creatives.ok ? buildCreativesData(creatives.rows) : [];
 
@@ -130,8 +135,6 @@ async function buildDashboardHtml(env) {
   const cacGoogleSpend = sumInWindow(googleDaily.rows, { dateKey: 'Day', valueKey: 'Cost', start: cacWindow.start, end: cacWindow.end });
   const cacValue = cac({ metaSpend: cacMetaSpend, googleSpend: cacGoogleSpend, newCustomers: newReturningTotals.newCustomers });
 
-  const provenCount = data.filter((ad) => ad.status === 'PROVEN').length;
-  const inProvenCount = data.filter((ad) => ad.in_proven).length;
 
   // MER/spend/sales cards need Shopify+Meta+Google day-level data all to be present —
   // computing them against a partially-0 source (e.g. Shopify down, Meta/Google fine)
@@ -158,12 +161,12 @@ async function buildDashboardHtml(env) {
         cacOk
           ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 90d)' }
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
-        creatives.ok
+        proven.count !== null
           ? {
-              icon: '✅ PROVEN', big: String(provenCount), bigColor: '#1E8A4C',
-              cap: `${inProvenCount} in Proven campaign · ${provenCount - inProvenCount} ready to move`,
+              icon: '✅ PROVEN', big: proven.count === null ? '—' : String(proven.count), bigColor: '#1E8A4C',
+              cap: proven.count === null ? '7-day qualification unavailable' : 'Qualified by last 7 days · Meta ad level',
             }
-          : { icon: '✅ PROVEN', big: '—', cap: 'Creatives data unavailable' },
+          : { icon: '✅ PROVEN', big: '—', cap: '7-day qualification unavailable' },
       ])
     : unavailableNote('KPI');
 
@@ -226,7 +229,7 @@ async function buildDashboardHtml(env) {
 
   const html = injectDashboard(
     {
-      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart, windowNote,
+      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart, windowNote, provenTab: proven.html,
       // Plain text (not unavailableNote's <div>) because this is injected inside an inline <span> in
       // the template; phrasing still matches "{label} data is temporarily unavailable" for consistency
       // with the other sections' degraded-state copy.

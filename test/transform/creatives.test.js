@@ -27,7 +27,7 @@ test('builds a single row per ad with computed cpa/roas/stage/status/persona fie
     cpa: 10,
     roas: 3,
     product: 'Starter',
-    status: 'PROVEN',
+    status: 'TESTING',
     camp: 'K-TS_UK_BOF-PROVEN',
     in_proven: true,
     persona: 'Upgrader',

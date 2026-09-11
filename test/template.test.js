@@ -4,6 +4,7 @@ const assert = require('node:assert');
 const { injectDashboard, injectIntoHtml } = require('../lib/template');
 
 const SECTIONS = {
+  provenTab: '<div>PROVEN</div>',
   kpiTop: '<div class="kpis">TOP</div>',
   googleTab: '<div>GOOGLE</div>',
   metaTab: '<div>META</div>',
@@ -66,7 +67,7 @@ test('throws a descriptive error if a literal marker is missing from the templat
   const templateWithHtmlMarkersOnly =
     '<!--INJECT:KPI_TOP--><!--INJECT:GOOGLE_TAB--><!--INJECT:META_TAB--><!--INJECT:OVERVIEW_TAB-->' +
     '<!--INJECT:INSIGHTS_TAB--><!--INJECT:PACKPROD_TAB--><!--INJECT:COHORT_TABLE--><!--INJECT:SUBSCRIPTION_TAB-->' +
-    '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><!--INJECT:WINDOW_NOTE--><script>no literal markers here</script>';
+    '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><!--INJECT:WINDOW_NOTE--><!--INJECT:PROVEN_TAB--><script>no literal markers here</script>';
   assert.throws(
     () => injectIntoHtml(templateWithHtmlMarkersOnly, SECTIONS, LITERALS),
     /Template marker \/\*INJECT:DATA\*\/ not found — has lib\/template\.html drifted\?/

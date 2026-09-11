@@ -3,6 +3,7 @@
     { "source": "/", "destination": "/api/dashboard" }
   ],
   "crons": [
+    { "path": "/api/sync-proven", "schedule": "50 6 * * *" },
     { "path": "/api/sync-windsor", "schedule": "0 6 * * *" },
     { "path": "/api/sync-shopify", "schedule": "10 6 * * *" },
     { "path": "/api/sync-creatives?chunk=0", "schedule": "20 6 * * *" },
@@ -13,6 +14,7 @@
     { "path": "/api/sync-creatives?chunk=5", "schedule": "45 6 * * *" }
   ],
   "functions": {
+    "api/sync-proven.js": { "maxDuration": 60 },
     "api/sync-windsor.js": { "maxDuration": 60 },
     "api/sync-shopify.js": { "maxDuration": 60 },
     "api/sync-creatives.js": { "maxDuration": 60 }
