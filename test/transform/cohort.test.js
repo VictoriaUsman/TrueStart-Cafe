@@ -53,3 +53,31 @@ test('parses a comma-formatted cohort size correctly (Google Sheets CSV export r
   const table = buildCohortTable([row('2025-08-08', 1, '13,905', 0.067)]);
   assert.strictEqual(table[0].size, 13905);
 });
+
+test('un-swaps the Cohort sheet\'s DATE(year, 1, month) formula bug, where the real month is encoded in the day slot', () => {
+  // Live "Cohort" tab export: every Month value is "YYYY-01-DD" with the real acquisition month
+  // sitting in the day slot (01-12) and the month slot pinned to 1, e.g. "2025-01-08" means Aug
+  // 2025, not 8 Jan 2025 — confirmed against that cohort's known customer count in production.
+  const table = buildCohortTable([
+    row('2025-01-08', 1, 1124, 0.067), // Aug 2025
+    row('2025-01-12', 1, 661, 0.077), // Dec 2025
+    row('2026-01-01', 1, 2399, 0.06), // Jan 2026
+    row('2026-01-07', 1, 1991, 0.05), // Jul 2026
+  ]);
+  assert.deepStrictEqual(
+    table.map((r) => r.cohortLabel),
+    ['Aug 2025', 'Dec 2025', 'Jan 2026', 'Jul 2026']
+  );
+});
+
+test('does not un-swap a normal fixed-pull-day January reading when only one cohort is present', () => {
+  // A single row can't distinguish "real Jan, pull-day 8th" from the swapped-formula case, so it
+  // must default to trusting the month field as-is (matches this sheet's normal-case convention).
+  const table = buildCohortTable([row('2026-01-08', 0, 100, 1)]);
+  assert.strictEqual(table[0].cohortLabel, 'Jan 2026');
+});
+
+test('does not un-swap when the day is pinned and the month varies (the sheet\'s normal convention)', () => {
+  const table = buildCohortTable([row('2025-08-08', 1, 100, 0.05), row('2025-09-08', 1, 200, 0.06)]);
+  assert.deepStrictEqual(table.map((r) => r.cohortLabel), ['Aug 2025', 'Sep 2025']);
+});
