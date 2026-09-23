@@ -1,5 +1,5 @@
 const { fetchWindsorData } = require('../lib/windsor');
-const { sevenDayWindow, buildProvenSnapshot } = require('../lib/transform/bof-rules');
+const { sevenDayWindow, buildSnapshot } = require('../lib/transform/bof-rules');
 const { writeProvenSnapshot } = require('../lib/bof-snapshot');
 
 async function syncProven(env, now = new Date()) {
@@ -7,9 +7,9 @@ async function syncProven(env, now = new Date()) {
   const timeZone = env.META_ACCOUNT_TIMEZONE || 'Europe/London';
   const window = sevenDayWindow(now, timeZone);
   const rows = await fetchWindsorData({ apiKey: env.WINDSOR_API_KEY, connector: 'facebook', accountId: '732629205086', ...window,
-    fields: ['ad_id', 'ad_name', 'campaign', 'spend', 'actions_omni_purchase'],
+    fields: ['ad_id', 'ad_name', 'campaign', 'spend', 'actions_omni_purchase', 'action_values_omni_purchase'],
   });
-  const snapshot = buildProvenSnapshot(rows, { ...window, timeZone, now });
+  const snapshot = buildSnapshot(rows, { ...window, timeZone, now });
   await writeProvenSnapshot(env, snapshot);
   return { ok: true, ads: snapshot.ads.length, ...window };
 }

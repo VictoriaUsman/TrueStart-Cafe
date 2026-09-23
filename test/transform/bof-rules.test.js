@@ -282,3 +282,29 @@ test('every result carries a ruleset, a non-empty reason and an action', () => {
   assert.equal(r.cpr, 10);
   assert.equal(r.roas, 2.5);
 });
+
+const { buildSnapshot } = require('../../lib/transform/bof-rules');
+
+test('revenue is summed per ad ID and a null revenue counts as zero', () => {
+  const snapshot = buildSnapshot([
+    { ad_id: '1', ad_name: 'Taster', campaign: 'K-BOF_Cold-ABO', spend: 50, actions_omni_purchase: 4, action_values_omni_purchase: 200 },
+    { ad_id: '1', ad_name: 'Taster', campaign: 'K-BOF_Cold-ABO', spend: 50, actions_omni_purchase: 4, action_values_omni_purchase: 150 },
+    { ad_id: '2', ad_name: 'Starter', campaign: 'K-BOF_Cold-ABO', spend: 30, actions_omni_purchase: 0, action_values_omni_purchase: null },
+  ], options);
+  assert.equal(snapshot.ads.length, 2);
+  assert.equal(snapshot.ads[0].revenue, 350);
+  assert.equal(snapshot.ads[1].revenue, 0);
+});
+
+test('a negative or non-numeric revenue is rejected rather than stored', () => {
+  const row = { ad_id: '1', ad_name: 'Taster', campaign: 'K-BOF_Cold-ABO', spend: 50, actions_omni_purchase: 4 };
+  assert.throws(() => buildSnapshot([{ ...row, action_values_omni_purchase: -1 }], options));
+  assert.throws(() => buildSnapshot([{ ...row, action_values_omni_purchase: 'bad' }], options));
+});
+
+test('the campaign name is carried onto every ad so rules can key off it', () => {
+  const snapshot = buildSnapshot([
+    { ad_id: '1', ad_name: 'Taster', campaign: 'K-BOF_Cold-ABO v2', spend: 50, actions_omni_purchase: 4, action_values_omni_purchase: 200 },
+  ], options);
+  assert.equal(snapshot.ads[0].campaign, 'K-BOF_Cold-ABO v2');
+});
