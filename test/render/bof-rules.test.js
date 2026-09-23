@@ -37,8 +37,15 @@ test('rows sort Kill first, then Recovery, Cold eligible, Keep running', () => {
 test('the table shows ROAS and a dash for an undefined cost per result', () => {
   const snapshot = buildSnapshot([row({ spend: 50, actions_omni_purchase: 0, action_values_omni_purchase: 0 })], options);
   const { html } = bofView(snapshot, now);
-  assert.match(html, /<th>7d ROAS<\/th>/);
+  assert.match(html, /<th>ROAS<\/th>/);
   assert.match(html, /<td>—<\/td>/);
+});
+
+test('the table restores a Product column between Campaign and Spend', () => {
+  const snapshot = buildSnapshot([row({ ad_name: 'X_Ritual_Price_Starter_Bags', spend: 10, actions_omni_purchase: 1, action_values_omni_purchase: 30 })], options);
+  const { html } = bofView(snapshot, now);
+  assert.match(html, /<th>Ad \/ Meta ID<\/th><th>Campaign<\/th><th>Product<\/th><th>Spend<\/th>/);
+  assert.match(html, /<td>Starter<\/td>/);
 });
 
 test('the status filter offers every status and each row carries data-status', () => {

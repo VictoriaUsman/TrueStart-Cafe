@@ -120,7 +120,7 @@ tr.tot td{font-weight:800;background:#fafbfc;border-top:2px solid #e7e9ee}
   <!--INJECT:META_TAB-->
  </section>
  <section class="panel" id="proven">
-  <h2>Creative performance · 7 days</h2>
+  <h2 id="bof-range-heading">Creative performance · 7 days</h2>
   <div class="dates">
     <button class="db active" id="bof-range-default">Last 7 days</button>
     <button class="db" id="bof-range-custom">Custom range</button>
@@ -150,6 +150,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelect
 document.querySelectorAll('.stab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.stab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.subpanel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.sub).classList.add('active');});
 redraw();
 var bofDefaultHtml=document.getElementById('bof-table-container').innerHTML;
+var bofDefaultHeading=document.getElementById('bof-range-heading')?document.getElementById('bof-range-heading').textContent:'';
 function bofBindStatusFilter(){
   var sel=document.getElementById('performance-status');
   if(!sel)return;
@@ -167,6 +168,7 @@ bofBindStatusFilter();
   var apply=document.getElementById('bof-range-apply');
   var status=document.getElementById('bof-range-status');
   var container=document.getElementById('bof-table-container');
+  var heading=document.getElementById('bof-range-heading');
   if(!def||!cust||!fields||!apply||!container)return;
   var bofReqId=0;
   function mode(isCustom){
@@ -179,6 +181,7 @@ bofBindStatusFilter();
     mode(false);
     status.textContent='';
     container.innerHTML=bofDefaultHtml;
+    if(heading)heading.textContent=bofDefaultHeading;
     bofBindStatusFilter();
   };
   cust.onclick=function(){mode(true);};
@@ -196,6 +199,7 @@ bofBindStatusFilter();
         // A failed range must never blank the seven-day view the reviewer relies on.
         if(!d.ok){status.textContent=d.error;return;}
         container.innerHTML=d.html;
+        if(heading)heading.textContent='Creative performance · '+d.dateFrom+' to '+d.dateTo;
         bofBindStatusFilter();
         status.textContent='';
       })

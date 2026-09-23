@@ -49,6 +49,23 @@ test('a valid range renders a table through the shared renderer', async () => {
   }
 });
 
+test('a range with no delivered ads is a successful, zeroed result — not a rejection', async () => {
+  const real = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => ({ data: [] }) });
+  try {
+    const result = await bofRange(env, { from: '2026-01-01', to: '2026-01-07' }, now);
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.counts, {
+      KILL: 0, RECOVERY: 0, COLD_ELIGIBLE: 0, KEEP_RUNNING: 0, UNAVAILABLE: 0,
+    });
+    assert.match(result.html, /no meta ads were delivered/i);
+    assert.equal(result.dateFrom, '2026-01-01');
+    assert.equal(result.dateTo, '2026-01-07');
+  } finally {
+    global.fetch = real;
+  }
+});
+
 test('a missing API key is refused before any fetch is attempted', async () => {
   await assert.rejects(() => bofRange({}, { from: '2026-09-01', to: '2026-09-07' }, now));
 });

@@ -1,6 +1,7 @@
 const { fetchWindsorData } = require('../lib/windsor');
-const { buildSnapshot } = require('../lib/transform/bof-rules');
-const { renderBofTable } = require('../lib/render/bof-rules');
+const { buildSnapshot, accountTimeZone } = require('../lib/transform/bof-rules');
+const { renderBofTable, STATUS_LABELS } = require('../lib/render/bof-rules');
+const { escapeHtml } = require('../lib/render/table');
 
 const ACCOUNT_ID = '732629205086';
 const MAX_RANGE_DAYS = 180;
@@ -30,7 +31,7 @@ function todayIn(timeZone, now) {
 
 async function bofRange(env, query, now = new Date()) {
   if (!env.WINDSOR_API_KEY) throw new Error('Missing WINDSOR_API_KEY');
-  const timeZone = env.META_ACCOUNT_TIMEZONE || 'Europe/London';
+  const timeZone = accountTimeZone(env);
 
   const { from, to } = query || {};
   if (!from || !to) throw new RangeRequestError('Both from and to are required.');
@@ -52,6 +53,22 @@ async function bofRange(env, query, now = new Date()) {
     dateFrom: from, dateTo: to,
     fields: ['ad_id', 'ad_name', 'campaign', 'spend', 'actions_omni_purchase', 'action_values_omni_purchase'],
   });
+
+  // "No ads delivered in this window" is a true, unremarkable answer for a
+  // user-chosen range (e.g. one predating the account's first delivery) — not
+  // the empty-cron-response case buildSnapshot's own guard protects against.
+  // Short-circuit before it so a legitimately empty range renders as a normal,
+  // successful result instead of a 500 advising a retry that can never help.
+  if (rows.length === 0) {
+    const counts = Object.fromEntries(Object.keys(STATUS_LABELS).map((status) => [status, 0]));
+    return {
+      ok: true,
+      html: `<p class="note">No Meta ads were delivered between ${escapeHtml(from)} and ${escapeHtml(to)}.</p>`,
+      counts,
+      dateFrom: from,
+      dateTo: to,
+    };
+  }
 
   const snapshot = buildSnapshot(rows, { dateFrom: from, dateTo: to, timeZone, now });
   const { html, counts } = renderBofTable({ ...snapshot, isDefaultWindow: false });

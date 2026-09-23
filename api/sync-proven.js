@@ -1,10 +1,10 @@
 const { fetchWindsorData } = require('../lib/windsor');
-const { sevenDayWindow, buildSnapshot } = require('../lib/transform/bof-rules');
+const { sevenDayWindow, buildSnapshot, accountTimeZone } = require('../lib/transform/bof-rules');
 const { writeProvenSnapshot } = require('../lib/bof-snapshot');
 
 async function syncProven(env, now = new Date()) {
   if (!env.WINDSOR_API_KEY) throw new Error('Missing WINDSOR_API_KEY');
-  const timeZone = env.META_ACCOUNT_TIMEZONE || 'Europe/London';
+  const timeZone = accountTimeZone(env);
   const window = sevenDayWindow(now, timeZone);
   const rows = await fetchWindsorData({ apiKey: env.WINDSOR_API_KEY, connector: 'facebook', accountId: '732629205086', ...window,
     fields: ['ad_id', 'ad_name', 'campaign', 'spend', 'actions_omni_purchase', 'action_values_omni_purchase'],

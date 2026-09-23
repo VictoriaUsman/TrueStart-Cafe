@@ -2,6 +2,7 @@
 const { fetchSheetTab } = require('../lib/sheets');
 const { readProvenSnapshot } = require('../lib/bof-snapshot');
 const { bofView } = require('../lib/render/bof-rules');
+const { accountTimeZone } = require('../lib/transform/bof-rules');
 const { fetchLowStockSnapshot } = require('../lib/shopify');
 const { toIsoDate, formatShortLabel } = require('../lib/dates');
 const { buildCreativesData } = require('../lib/transform/creatives');
@@ -96,7 +97,7 @@ async function buildDashboardHtml(env) {
     readProvenSnapshot(env).catch((err) => { console.error('[dashboard] Proven snapshot:', err.message); return null; }),
   ]);
 
-  const proven = bofView(provenSnapshot, new Date(), env.META_ACCOUNT_TIMEZONE || 'Europe/London');
+  const proven = bofView(provenSnapshot, new Date(), accountTimeZone(env));
 
   const data = creatives.ok ? buildCreativesData(creatives.rows) : [];
 

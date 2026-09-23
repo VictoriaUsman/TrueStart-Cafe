@@ -14,6 +14,10 @@ test('product does not require a recognized persona', () => {
   assert.equal(productForAd('PDP_Beans'), 'PDP / other');
 });
 
+test('an ad name mentioning both products is Unknown, not a thrown error', () => {
+  assert.equal(productForAd('Taster_vs_Starter_Comparison'), 'Unknown');
+});
+
 const now = new Date('2026-09-11T08:00:00Z');
 const options = { ...sevenDayWindow(now), timeZone: 'Europe/London', now };
 
@@ -43,6 +47,12 @@ test('campaign names are matched by prefix, so live suffixes still resolve', () 
   assert.equal(rulesetFor('K-TS_UK_BOF_StarterMugs_ABO Retargeting'), 'STARTER');
   assert.equal(rulesetFor('  k-bof_cold-abo v2  '), 'COLD');
   assert.equal(rulesetFor('K-BOF_PDP-CBO'), 'PDP');
+});
+
+test('the Taster placeholder key matches whatever suffix the live campaign turns out to carry', () => {
+  assert.equal(rulesetFor('K-TS_UK_BOF_Taster'), 'TASTER');
+  assert.equal(rulesetFor('K-TS_UK_BOF_Taster_CBO'), 'TASTER');
+  assert.equal(rulesetFor('K-TS_UK_BOF_Taster_ABO'), 'TASTER');
 });
 
 test('an unlisted BOF campaign falls back to the PDP ruleset', () => {
@@ -155,6 +165,16 @@ test('revenue is summed per ad ID and a null revenue counts as zero', () => {
   assert.equal(snapshot.ads.length, 2);
   assert.equal(snapshot.ads[0].revenue, 350);
   assert.equal(snapshot.ads[1].revenue, 0);
+});
+
+test('rows for one ad id disagreeing on product no longer throw; the first product seen is kept', () => {
+  const snapshot = buildSnapshot([
+    { ad_id: '1', ad_name: 'X_Ritual_Price_Taster_Bags', campaign: 'K-BOF_Cold-ABO', spend: 50, actions_omni_purchase: 4, action_values_omni_purchase: 200 },
+    { ad_id: '1', ad_name: 'X_Ritual_Price_Starter_Bags', campaign: 'K-BOF_Cold-ABO', spend: 50, actions_omni_purchase: 4, action_values_omni_purchase: 200 },
+  ], options);
+  assert.equal(snapshot.ads.length, 1);
+  assert.equal(snapshot.ads[0].product, 'Taster');
+  assert.equal(snapshot.ads[0].spend, 100);
 });
 
 test('a negative or non-numeric revenue is rejected rather than stored', () => {
