@@ -1,7 +1,7 @@
 // test/transform/status.test.js
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { getCreativeStatus, isInProvenCampaign } = require('../../lib/transform/status');
+const { getCreativeStatus } = require('../../lib/transform/status');
 
 test('TOF/MOF campaigns are always Feeder regardless of performance', () => {
   assert.strictEqual(
@@ -37,9 +37,4 @@ test('historical purchase totals do not establish seven-day qualification', () =
     getCreativeStatus({ campaignName: 'K-TS_UK_BOF_Sales Retargeting', spend: 402.3, purchases: 20 }),
     'TESTING'
   );
-});
-
-test('isInProvenCampaign is true only for the dedicated Proven campaign', () => {
-  assert.strictEqual(isInProvenCampaign('K-TS_UK_BOF-PROVEN'), true);
-  assert.strictEqual(isInProvenCampaign('K-TS_UK_BOF_Sales Retargeting'), false);
 });

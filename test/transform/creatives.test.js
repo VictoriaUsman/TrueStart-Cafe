@@ -29,7 +29,6 @@ test('builds a single row per ad with computed cpa/roas/stage/status/persona fie
     product: 'Starter',
     status: 'TESTING',
     camp: 'K-TS_UK_BOF-PROVEN',
-    in_proven: true,
     persona: 'Upgrader',
     angle: 'Price',
     format: 'Bags',
