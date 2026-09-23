@@ -168,12 +168,14 @@ bofBindStatusFilter();
   var status=document.getElementById('bof-range-status');
   var container=document.getElementById('bof-table-container');
   if(!def||!cust||!fields||!apply||!container)return;
+  var bofReqId=0;
   function mode(isCustom){
     cust.classList.toggle('active',isCustom);
     def.classList.toggle('active',!isCustom);
     fields.hidden=!isCustom;
   }
   def.onclick=function(){
+    bofReqId++;
     mode(false);
     status.textContent='';
     container.innerHTML=bofDefaultHtml;
@@ -186,16 +188,21 @@ bofBindStatusFilter();
     if(!from||!to){status.textContent='Pick both a start and an end date.';return;}
     status.textContent='Loading…';
     apply.disabled=true;
+    var reqId=++bofReqId;
     fetch('/api/bof-range?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to))
       .then(function(r){return r.json();})
       .then(function(d){
+        if(reqId!==bofReqId)return;
         // A failed range must never blank the seven-day view the reviewer relies on.
         if(!d.ok){status.textContent=d.error;return;}
         container.innerHTML=d.html;
         bofBindStatusFilter();
         status.textContent='';
       })
-      .catch(function(){status.textContent='Could not load that date range. Please try again shortly.';})
+      .catch(function(){
+        if(reqId!==bofReqId)return;
+        status.textContent='Could not load that date range. Please try again shortly.';
+      })
       .finally(function(){apply.disabled=false;});
   };
 })();

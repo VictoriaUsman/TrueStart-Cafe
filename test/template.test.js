@@ -129,3 +129,15 @@ test('a failed range fetch leaves the seven-day table in place', () => {
   // The error branch must set status text only — it must never touch container.innerHTML.
   assert.match(original, /if\(!d\.ok\)\{status\.textContent=d\.error;return;\}/);
 });
+
+test('a stale range fetch cannot overwrite a view the user has since navigated away from', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  // A per-request token, bumped on every Apply and on every return to the default view, guards
+  // both the success and failure callbacks so a late-resolving fetch can no longer clobber
+  // whatever the user is looking at now.
+  assert.match(original, /var bofReqId=0;/);
+  assert.match(original, /bofReqId\+\+;/);
+  assert.match(original, /var reqId=\+\+bofReqId;/);
+  const guardCount = (original.match(/if\(reqId!==bofReqId\)return;/g) || []).length;
+  assert.strictEqual(guardCount, 2, 'the stale-response guard must appear in both the .then and .catch callbacks');
+});
