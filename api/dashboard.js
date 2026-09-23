@@ -1,7 +1,7 @@
 // api/dashboard.js
 const { fetchSheetTab } = require('../lib/sheets');
 const { readProvenSnapshot } = require('../lib/bof-snapshot');
-const { provenView } = require('../lib/render/bof-rules');
+const { bofView } = require('../lib/render/bof-rules');
 const { fetchLowStockSnapshot } = require('../lib/shopify');
 const { toIsoDate, formatShortLabel } = require('../lib/dates');
 const { buildCreativesData } = require('../lib/transform/creatives');
@@ -96,7 +96,7 @@ async function buildDashboardHtml(env) {
     readProvenSnapshot(env).catch((err) => { console.error('[dashboard] Proven snapshot:', err.message); return null; }),
   ]);
 
-  const proven = provenView(provenSnapshot, new Date(), env.META_ACCOUNT_TIMEZONE || 'Europe/London');
+  const proven = bofView(provenSnapshot, new Date(), env.META_ACCOUNT_TIMEZONE || 'Europe/London');
 
   const data = creatives.ok ? buildCreativesData(creatives.rows) : [];
 
@@ -161,10 +161,10 @@ async function buildDashboardHtml(env) {
         cacOk
           ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 90d)' }
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
-        proven.count !== null
+        proven.counts !== null
           ? {
-              icon: '✅ PROVEN', big: proven.count === null ? '—' : String(proven.count), bigColor: '#1E8A4C',
-              cap: proven.count === null ? '7-day qualification unavailable' : 'Qualified by last 7 days · Meta ad level',
+              icon: '✅ PROVEN', big: proven.counts === null ? '—' : String(proven.counts.KILL), bigColor: '#1E8A4C',
+              cap: proven.counts === null ? '7-day qualification unavailable' : 'Qualified by last 7 days · Meta ad level',
             }
           : { icon: '✅ PROVEN', big: '—', cap: '7-day qualification unavailable' },
       ])
