@@ -1,7 +1,8 @@
 // api/dashboard.js
 const { fetchSheetTab } = require('../lib/sheets');
-const { readProvenSnapshot } = require('../lib/proven-snapshot');
-const { provenView } = require('../lib/render/proven');
+const { readProvenSnapshot } = require('../lib/bof-snapshot');
+const { bofView } = require('../lib/render/bof-rules');
+const { accountTimeZone } = require('../lib/transform/bof-rules');
 const { fetchLowStockSnapshot } = require('../lib/shopify');
 const { toIsoDate, formatShortLabel } = require('../lib/dates');
 const { buildCreativesData } = require('../lib/transform/creatives');
@@ -96,7 +97,7 @@ async function buildDashboardHtml(env) {
     readProvenSnapshot(env).catch((err) => { console.error('[dashboard] Proven snapshot:', err.message); return null; }),
   ]);
 
-  const proven = provenView(provenSnapshot, new Date(), env.META_ACCOUNT_TIMEZONE || 'Europe/London');
+  const proven = bofView(provenSnapshot, new Date(), accountTimeZone(env));
 
   const data = creatives.ok ? buildCreativesData(creatives.rows) : [];
 
@@ -161,12 +162,12 @@ async function buildDashboardHtml(env) {
         cacOk
           ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 90d)' }
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
-        proven.count !== null
+        proven.counts !== null
           ? {
-              icon: '✅ PROVEN', big: proven.count === null ? '—' : String(proven.count), bigColor: '#1E8A4C',
-              cap: proven.count === null ? '7-day qualification unavailable' : 'Qualified by last 7 days · Meta ad level',
+              icon: '🛑 KILL · last 7 days', big: String(proven.counts.KILL), bigColor: '#C0392B',
+              cap: 'BOF ads meeting their campaign kill rules',
             }
-          : { icon: '✅ PROVEN', big: '—', cap: '7-day qualification unavailable' },
+          : { icon: '🛑 KILL · last 7 days', big: '—', cap: '7-day evaluation unavailable' },
       ])
     : unavailableNote('KPI');
 

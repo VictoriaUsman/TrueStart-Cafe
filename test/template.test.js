@@ -109,3 +109,35 @@ test('escapes "</script>" inside an injected literal so it cannot break out of t
   assert.doesNotMatch(html, /<\/script><script>alert/);
   assert.match(html, /\\u003c\/script>\\u003cscript>alert\(1\)\\u003c\/script>/);
 });
+
+test('the BOF panel has a date range control wired to the range endpoint', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  assert.match(original, /id="bof-range-default"/);
+  assert.match(original, /id="bof-range-custom"/);
+  assert.match(original, /id="bof-range-from"/);
+  assert.match(original, /id="bof-range-to"/);
+  assert.match(original, /\/api\/bof-range\?from='\+encodeURIComponent/);
+});
+
+test('the injected BOF table lives in a container the range fetch can replace', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  assert.match(original, /id="bof-table-container"><!--INJECT:PROVEN_TAB--></);
+});
+
+test('a failed range fetch leaves the seven-day table in place', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  // The error branch must set status text only — it must never touch container.innerHTML.
+  assert.match(original, /if\(!d\.ok\)\{status\.textContent=d\.error;return;\}/);
+});
+
+test('a stale range fetch cannot overwrite a view the user has since navigated away from', () => {
+  const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+  // A per-request token, bumped on every Apply and on every return to the default view, guards
+  // both the success and failure callbacks so a late-resolving fetch can no longer clobber
+  // whatever the user is looking at now.
+  assert.match(original, /var bofReqId=0;/);
+  assert.match(original, /bofReqId\+\+;/);
+  assert.match(original, /var reqId=\+\+bofReqId;/);
+  const guardCount = (original.match(/if\(reqId!==bofReqId\)return;/g) || []).length;
+  assert.strictEqual(guardCount, 2, 'the stale-response guard must appear in both the .then and .catch callbacks');
+});
