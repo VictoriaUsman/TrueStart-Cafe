@@ -49,10 +49,10 @@ test('campaign names are matched by prefix, so live suffixes still resolve', () 
   assert.equal(rulesetFor('K-BOF_PDP-CBO'), 'PDP');
 });
 
-test('the Taster placeholder key matches whatever suffix the live campaign turns out to carry', () => {
-  assert.equal(rulesetFor('K-TS_UK_BOF_Taster'), 'TASTER');
-  assert.equal(rulesetFor('K-TS_UK_BOF_Taster_CBO'), 'TASTER');
-  assert.equal(rulesetFor('K-TS_UK_BOF_Taster_ABO'), 'TASTER');
+test('the confirmed Sales Retargeting campaign uses Taster rules, including normalized names and suffixes', () => {
+  assert.equal(rulesetFor('K-TS_UK_BOF_Sales Retargeting'), 'TASTER');
+  assert.equal(rulesetFor('  k-ts_uk_bof_sales retargeting  '), 'TASTER');
+  assert.equal(rulesetFor('K-TS_UK_BOF_Sales Retargeting v2'), 'TASTER');
 });
 
 test('an unlisted BOF campaign falls back to the PDP ruleset', () => {
@@ -95,7 +95,7 @@ test('PDP has no recovery band but the same kill and cold-eligible bars', () => 
 });
 
 test('Taster kills above £24, recovers above £18, and is never cold eligible', () => {
-  const taster = (over) => ad({ campaign: 'K-TS_UK_BOF_Taster_ABO', ...over });
+  const taster = (over) => ad({ campaign: 'K-TS_UK_BOF_Sales Retargeting', ...over });
   assert.equal(evaluateAd(taster({ spend: 240, purchases: 10 })).status, 'RECOVERY');
   assert.equal(evaluateAd(taster({ spend: 240.10, purchases: 10 })).status, 'KILL');
   assert.equal(evaluateAd(taster({ spend: 180, purchases: 10 })).status, 'KEEP_RUNNING');
@@ -115,7 +115,7 @@ test('Cold kills on spend-gated ROAS and CPR, and never recovers or qualifies as
 });
 
 test('spend >= £100 with zero purchases kills in every ruleset, CPR stays null', () => {
-  for (const campaign of ['K-TS_UK_BOF_StarterMugs_ABO', 'K-BOF_PDP-CBO', 'K-TS_UK_BOF_Taster_ABO', 'K-BOF_Cold-ABO']) {
+  for (const campaign of ['K-TS_UK_BOF_StarterMugs_ABO', 'K-BOF_PDP-CBO', 'K-TS_UK_BOF_Sales Retargeting', 'K-BOF_Cold-ABO']) {
     const r = evaluateAd(ad({ campaign, spend: 100, purchases: 0, revenue: 0 }));
     assert.equal(r.status, 'KILL');
     assert.equal(r.cpr, null);

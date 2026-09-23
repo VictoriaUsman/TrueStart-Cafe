@@ -30,14 +30,17 @@ test('to must be before today in the account timezone', async () => {
 
 test('a valid range renders a table through the shared renderer', async () => {
   const real = global.fetch;
-  global.fetch = async () => ({
+  global.fetch = async (url) => {
+    assert.equal(new URL(url).searchParams.get('use_unified_attribution_setting'), 'true');
+    return ({
     ok: true,
     json: async () => ({ data: [{
       account_id: '732629205086', ad_id: '1', ad_name: 'Ad',
       campaign: 'K-TS_UK_BOF_StarterMugs_ABO', spend: 400,
       actions_omni_purchase: 10, action_values_omni_purchase: 500,
     }] }),
-  });
+    });
+  };
   try {
     const result = await bofRange(env, { from: '2026-09-01', to: '2026-09-21' }, now);
     assert.equal(result.ok, true);

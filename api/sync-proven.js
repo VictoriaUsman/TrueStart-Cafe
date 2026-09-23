@@ -1,4 +1,4 @@
-const { fetchWindsorData } = require('../lib/windsor');
+const { fetchBofData } = require('../lib/bof-data');
 const { sevenDayWindow, buildSnapshot, accountTimeZone } = require('../lib/transform/bof-rules');
 const { writeProvenSnapshot } = require('../lib/bof-snapshot');
 
@@ -6,9 +6,7 @@ async function syncProven(env, now = new Date()) {
   if (!env.WINDSOR_API_KEY) throw new Error('Missing WINDSOR_API_KEY');
   const timeZone = accountTimeZone(env);
   const window = sevenDayWindow(now, timeZone);
-  const rows = await fetchWindsorData({ apiKey: env.WINDSOR_API_KEY, connector: 'facebook', accountId: '732629205086', ...window,
-    fields: ['ad_id', 'ad_name', 'campaign', 'spend', 'actions_omni_purchase', 'action_values_omni_purchase'],
-  });
+  const rows = await fetchBofData(env, window);
   const snapshot = buildSnapshot(rows, { ...window, timeZone, now });
   await writeProvenSnapshot(env, snapshot);
   return { ok: true, ads: snapshot.ads.length, ...window };

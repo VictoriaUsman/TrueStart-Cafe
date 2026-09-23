@@ -1,9 +1,8 @@
-const { fetchWindsorData } = require('../lib/windsor');
+const { fetchBofData } = require('../lib/bof-data');
 const { buildSnapshot, accountTimeZone } = require('../lib/transform/bof-rules');
 const { renderBofTable, STATUS_LABELS } = require('../lib/render/bof-rules');
 const { escapeHtml } = require('../lib/render/table');
 
-const ACCOUNT_ID = '732629205086';
 const MAX_RANGE_DAYS = 180;
 const DAY_MS = 86400000;
 
@@ -48,11 +47,7 @@ async function bofRange(env, query, now = new Date()) {
     throw new RangeRequestError('Only complete days can be shown, so the end date must be before today.');
   }
 
-  const rows = await fetchWindsorData({
-    apiKey: env.WINDSOR_API_KEY, connector: 'facebook', accountId: ACCOUNT_ID,
-    dateFrom: from, dateTo: to,
-    fields: ['ad_id', 'ad_name', 'campaign', 'spend', 'actions_omni_purchase', 'action_values_omni_purchase'],
-  });
+  const rows = await fetchBofData(env, { dateFrom: from, dateTo: to });
 
   // "No ads delivered in this window" is a true, unremarkable answer for a
   // user-chosen range (e.g. one predating the account's first delivery) — not

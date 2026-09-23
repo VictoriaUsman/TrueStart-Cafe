@@ -78,3 +78,25 @@ test('a stale or missing snapshot renders as unavailable, not as zero ads', () =
   assert.equal(bofView(null, now).counts, null);
   assert.equal(bofView(fresh, new Date('2026-09-23T08:00:00Z')).counts, null);
 });
+
+test('snapshots from before explicit ad-set attribution require a refresh', () => {
+  const snapshot = buildSnapshot([row()], options);
+  delete snapshot.metricBasis;
+  const view = bofView(snapshot, now);
+  assert.equal(view.counts, null);
+  assert.match(view.html, /unavailable/);
+});
+
+test('Sales Retargeting uses Taster thresholds and never recommends duplication, regardless of ad product name', () => {
+  const snapshot = buildSnapshot([
+    row({ ad_id: '1', campaign: 'K-TS_UK_BOF_Sales Retargeting', ad_name: 'PDP_Beans', spend: 190, actions_omni_purchase: 10 }),
+    row({ ad_id: '2', campaign: 'K-TS_UK_BOF_Sales Retargeting', spend: 250, actions_omni_purchase: 10 }),
+    row({ ad_id: '3', campaign: 'K-TS_UK_BOF_Sales Retargeting', spend: 150, actions_omni_purchase: 15, action_values_omni_purchase: 450 }),
+  ], options);
+  const view = bofView(snapshot, now);
+  assert.equal(view.counts.RECOVERY, 1);
+  assert.equal(view.counts.KILL, 1);
+  assert.equal(view.counts.KEEP_RUNNING, 1);
+  assert.equal(view.counts.COLD_ELIGIBLE, 0);
+  assert.doesNotMatch(view.html, /Eligible to duplicate/);
+});

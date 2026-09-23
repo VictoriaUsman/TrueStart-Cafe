@@ -19,6 +19,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;p
 th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;background:#fafbfc;cursor:pointer}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}td.nm{font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
 .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff}
+#proven-table .pill{white-space:nowrap;line-height:1.5;vertical-align:middle}
+#proven-table th:nth-child(8),#proven-table td:nth-child(8){white-space:nowrap;min-width:112px}
 .bar{display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid #e7e9ee}.bar div{height:100%}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 0;font-size:12px;color:#444}.lg2 i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
 .note{background:#fffef5;border:1px solid #f2e7a8;border-radius:12px;padding:13px 17px;font-size:13px;margin:12px 0}
@@ -26,6 +28,13 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}td.nm{font-family:u
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px}.fbtn{padding:5px 13px;border:1px solid #d0d3da;border-radius:20px;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#444}.fbtn.active{background:#111;color:#fff;border-color:#111}
 .two{display:flex;gap:18px;flex-wrap:wrap}.two>div{flex:1;min-width:330px}
 .dates{display:flex;gap:8px;margin:4px 0 12px}.db{padding:6px 13px;border:1px solid #d0d3da;border-radius:20px;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#444}.db.active{background:#5b5be6;color:#fff;border-color:#5b5be6}
+#proven label{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#444}
+#proven input[type="date"],#performance-status{font-family:inherit;font-size:12px;font-weight:600;line-height:1.5;color:#444;background:#fff;border:1px solid #d0d3da;border-radius:8px;padding:6px 10px;min-height:34px;max-width:100%;color-scheme:light}
+#proven input[type="date"]:focus-visible,#performance-status:focus-visible{outline:2px solid #5b5be6;outline-offset:2px;border-color:#5b5be6}
+#performance-status{cursor:pointer}
+#proven button{font-family:inherit}
+#bof-range-fields:not([hidden]){display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#bof-range-status:empty{display:none}
 .cl{font-size:11.5px;color:#555;margin-top:6px}.cl i{display:inline-block;width:20px;height:0;border-top:2px solid #5b5be6;vertical-align:middle;margin-right:5px}.cl i.p{border-top:2px dashed #b9bde8}
 details.camp{background:#fff;border:1px solid #e7e9ee;border-radius:12px;margin:8px 0;overflow:hidden}
 details.camp>summary{list-style:none;cursor:pointer;padding:13px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
