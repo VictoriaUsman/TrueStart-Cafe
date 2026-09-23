@@ -163,10 +163,10 @@ async function buildDashboardHtml(env) {
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
         proven.counts !== null
           ? {
-              icon: '✅ PROVEN', big: proven.counts === null ? '—' : String(proven.counts.KILL), bigColor: '#1E8A4C',
-              cap: proven.counts === null ? '7-day qualification unavailable' : 'Qualified by last 7 days · Meta ad level',
+              icon: '🛑 KILL · last 7 days', big: String(proven.counts.KILL), bigColor: '#C0392B',
+              cap: 'BOF ads meeting their campaign kill rules',
             }
-          : { icon: '✅ PROVEN', big: '—', cap: '7-day qualification unavailable' },
+          : { icon: '🛑 KILL · last 7 days', big: '—', cap: '7-day evaluation unavailable' },
       ])
     : unavailableNote('KPI');
 

@@ -219,8 +219,10 @@ test('a single day-level source failure (Google) blanks the MER/spend/sales KPI 
     assert.match(html, /ROAS \/ MER — data unavailable/);
     assert.match(html, /Spend — data unavailable/);
     assert.doesNotMatch(html, /class="chg up"/);
-    // The PROVEN card is independent of the day-level sources and should still render for real.
-    assert.match(html, /✅ PROVEN/);
+    // The KILL card is independent of the day-level sources but depends on the BOF snapshot.
+    // Since ENV has no GOOGLE_SHEET_ID, the snapshot read fails and it shows unavailable.
+    assert.match(html, /🛑 KILL · last 7 days/);
+    assert.match(html, /7-day evaluation unavailable/);
   } finally {
     global.fetch = originalFetch;
   }
@@ -238,8 +240,8 @@ test('the KPI row still renders (with per-card fallbacks) when creatives fails b
     // Real numbers for the day-level cards, since Shopify/Meta/Google all succeeded.
     assert.match(html, /class="kpis">/);
     assert.doesNotMatch(html, /ROAS \/ MER — data unavailable/);
-    // PROVEN card falls back since creatives failed.
-    assert.match(html, /7-day qualification unavailable/);
+    // KILL card falls back since creatives failed.
+    assert.match(html, /7-day evaluation unavailable/);
   } finally {
     global.fetch = originalFetch;
   }
@@ -271,6 +273,22 @@ test('the KPI window note shows the real current 30-day windows, not a hardcoded
     const html = await buildDashboardHtml(ENV);
     assert.doesNotMatch(html, /Jul 20 – Aug 18/); // the old hardcoded snapshot dates
     assert.match(html, /KPI cards above show the <b>last 30 days \([A-Za-z]{3} \d{1,2} – [A-Za-z]{3} \d{1,2}\)<\/b>/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('the top KPI row shows a kill count, not a Proven count', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchAllOk();
+  try {
+    const html = await buildDashboardHtml(ENV);
+    // The emoji anchors this: the injected DATA literal legitimately contains the
+    // string "K-TS_UK_BOF-PROVEN" as a historical campaign name, so a bare
+    // /PROVEN/ would match that and never fail.
+    assert.doesNotMatch(html, /✅ PROVEN/);
+    assert.match(html, /KILL · last 7 days/);
+    assert.match(html, /7-day evaluation unavailable/);
   } finally {
     global.fetch = originalFetch;
   }
