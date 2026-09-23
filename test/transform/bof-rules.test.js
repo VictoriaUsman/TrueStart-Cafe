@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { sevenDayWindow, evaluateProven, buildProvenSnapshot, productForAd } = require('../../lib/transform/proven');
-const { provenView } = require('../../lib/render/proven');
+const { sevenDayWindow, evaluateProven, buildProvenSnapshot, productForAd } = require('../../lib/transform/bof-rules');
+const { provenView } = require('../../lib/render/bof-rules');
 
 test('Proven at exactly £150/15 purchases/CPA==bar, for every product', () => {
   for (const [product, bar] of [['Taster', 12], ['Starter', 15], ['PDP / other', 20]]) {

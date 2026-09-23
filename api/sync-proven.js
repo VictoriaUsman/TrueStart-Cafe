@@ -1,6 +1,6 @@
 const { fetchWindsorData } = require('../lib/windsor');
-const { sevenDayWindow, buildProvenSnapshot } = require('../lib/transform/proven');
-const { writeProvenSnapshot } = require('../lib/proven-snapshot');
+const { sevenDayWindow, buildProvenSnapshot } = require('../lib/transform/bof-rules');
+const { writeProvenSnapshot } = require('../lib/bof-snapshot');
 
 async function syncProven(env, now = new Date()) {
   if (!env.WINDSOR_API_KEY) throw new Error('Missing WINDSOR_API_KEY');

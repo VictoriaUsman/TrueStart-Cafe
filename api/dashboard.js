@@ -1,7 +1,7 @@
 // api/dashboard.js
 const { fetchSheetTab } = require('../lib/sheets');
-const { readProvenSnapshot } = require('../lib/proven-snapshot');
-const { provenView } = require('../lib/render/proven');
+const { readProvenSnapshot } = require('../lib/bof-snapshot');
+const { provenView } = require('../lib/render/bof-rules');
 const { fetchLowStockSnapshot } = require('../lib/shopify');
 const { toIsoDate, formatShortLabel } = require('../lib/dates');
 const { buildCreativesData } = require('../lib/transform/creatives');
