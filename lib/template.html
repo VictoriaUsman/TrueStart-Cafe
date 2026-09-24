@@ -60,7 +60,7 @@ tr.tot td{font-weight:800;background:#fafbfc;border-top:2px solid #e7e9ee}
 .sku{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6b7280}
 .muted{color:#9aa0aa}
 </style></head><body>
-<header><div class="wrap"><h1>TrueStart — Paid Media Dashboard</h1><div class="sub">Account blended (Shopify-verified) + Meta creative performance · <!--INJECT:PERIOD_LABEL--> · deltas vs previous 30d (<!--INJECT:COMPARISON_LABEL-->)</div></div></header>
+<header><div class="wrap"><h1>TrueStart — Paid Media Dashboard</h1><div class="sub">Account blended (Shopify-verified) + Meta creative performance · <!--INJECT:PERIOD_LABEL--> · deltas vs <!--INJECT:COMPARISON_NAME--> (<!--INJECT:COMPARISON_LABEL-->)</div></div></header>
 <div class="wrap">
  <!--INJECT:RANGE_CONTROLS-->
   <!--INJECT:KPI_TOP-->
@@ -211,7 +211,9 @@ bofBindStatusFilter();
   // dates. Assuming any 7-day preset matches was wrong: the snapshot's window is
   // whatever the last successful sync captured, which can lag the selection.
   var snapshotMatches=(RANGE.snapshotStart===RANGE.start&&RANGE.snapshotEnd===RANGE.end);
-  if(snapshotMatches)return;
+  // Matching dates alone do not suffice: the server rejects a stale or
+  // wrong-metric snapshot, and skipping then would strand an unavailable message.
+  if(snapshotMatches&&RANGE.snapshotRendered)return;
   status.textContent='Loading '+RANGE.start+' to '+RANGE.end+'…';
   fetch('/api/bof-range?from='+encodeURIComponent(RANGE.start)+'&to='+encodeURIComponent(RANGE.end))
     .then(function(r){return r.json();})
@@ -220,6 +222,12 @@ bofBindStatusFilter();
       if(!d.ok){status.textContent=d.error;return;}
       container.innerHTML=d.html;
       bofBindStatusFilter();
+      // Keep the top-row Kill card describing the same window as this table,
+      // rather than leaving it on the seven-day snapshot.
+      var killBig=document.getElementById('kpi-kill');
+      var killCap=document.getElementById('kpi-kill-cap');
+      if(killBig&&d.counts){killBig.textContent=String(d.counts.KILL);}
+      if(killCap&&d.counts){killCap.textContent='BOF kill rules · '+d.dateFrom+' to '+d.dateTo;}
       if(heading)heading.textContent='Creative performance · '+d.dateFrom+' to '+d.dateTo;
       status.textContent='';
     })

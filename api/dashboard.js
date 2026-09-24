@@ -235,32 +235,43 @@ async function buildDashboardHtml(env, query = {}) {
   const P = cardPeriod;
   // Shown instead of an arrow when a period is only partly covered.
   const incomparableCaption = { text: 'no comparison — incomplete history', style: 'color:#9aa0aa' };
+  // MER divides one source by two others. If they do not all cover the same days
+  // the ratio is not a blended return, it is one period's sales over another
+  // period's spend — a number with no meaning, so it is withheld rather than shown.
+  const merValid = shopifyCoverage.complete && metaCoverage.complete && googleCoverage.complete;
+  // A single-source total IS correct for the days it holds; it just is not the
+  // range the heading claims, so the card says which days it actually covers.
+  const partialCap = (base, c) =>
+    c.complete ? base : `${base} — only ${c.empty ? 'no days' : `${c.first} to ${c.last}`} of the selected range`;
 
   const kpiTop = kpiRowNeeded
     ? renderKpiRow([
         dayLevelOk
-          ? { icon: `◐ BLENDED · ${P}`, big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: merComparable ? deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) : incomparableCaption }
+          ? (merValid
+              ? { icon: `◐ BLENDED · ${P}`, big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: merComparable ? deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) : incomparableCaption }
+              : { icon: `◐ BLENDED · ${P}`, big: '—', cap: 'ROAS / MER — sources cover different parts of this range' })
           : { icon: `◐ BLENDED · ${P}`, big: '—', cap: 'ROAS / MER — data unavailable' },
         dayLevelOk
-          ? { icon: `ⓕ META · ${P}`, big: formatMoneyK(metaSpend), cap: 'Spend', chg: metaComparable ? deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) : incomparableCaption }
+          ? { icon: `ⓕ META · ${P}`, big: formatMoneyK(metaSpend), cap: partialCap('Spend', metaCoverage), chg: metaComparable ? deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) : incomparableCaption }
           : { icon: `ⓕ META · ${P}`, big: '—', cap: 'Spend — data unavailable' },
         dayLevelOk
-          ? { icon: `Ⓖ GOOGLE · ${P}`, big: formatMoneyK(googleSpend), cap: 'Cost', chg: googleComparable ? deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) : incomparableCaption }
+          ? { icon: `Ⓖ GOOGLE · ${P}`, big: formatMoneyK(googleSpend), cap: partialCap('Cost', googleCoverage), chg: googleComparable ? deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) : incomparableCaption }
           : { icon: `Ⓖ GOOGLE · ${P}`, big: '—', cap: 'Cost — data unavailable' },
         dayLevelOk
-          ? { icon: `🛍 SHOPIFY · ${P}`, big: formatMoneyK(shopifySales), cap: 'Total sales', chg: shopifyComparable ? deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) : incomparableCaption }
+          ? { icon: `🛍 SHOPIFY · ${P}`, big: formatMoneyK(shopifySales), cap: partialCap('Total sales', shopifyCoverage), chg: shopifyComparable ? deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) : incomparableCaption }
           : { icon: `🛍 SHOPIFY · ${P}`, big: '—', cap: 'Total sales — data unavailable' },
         cacOk
           ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · fixed 90-day window — not the selected range' }
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
         proven.counts !== null
           ? {
-              icon: '🛑 KILL · last 7 days', big: String(proven.counts.KILL), bigColor: '#C0392B',
+              icon: '🛑 KILL · last 7 days', bigId: 'kpi-kill', capId: 'kpi-kill-cap',
+              big: String(proven.counts.KILL), bigColor: '#C0392B',
               cap: provenSnapshot && (provenSnapshot.dateFrom !== start || provenSnapshot.dateTo !== end)
                 ? `BOF kill rules · ${formatShortLabel(provenSnapshot.dateFrom)} – ${formatShortLabel(provenSnapshot.dateTo)}, not the selected range`
                 : 'BOF ads meeting their campaign kill rules',
             }
-          : { icon: '🛑 KILL · last 7 days', big: '—', cap: '7-day evaluation unavailable' },
+          : { icon: '🛑 KILL · last 7 days', bigId: 'kpi-kill', capId: 'kpi-kill-cap', big: '—', cap: '7-day evaluation unavailable' },
       ])
     : unavailableNote('KPI');
 
@@ -346,7 +357,7 @@ async function buildDashboardHtml(env, query = {}) {
 
   // The month containing the anchor date is still in progress (synced daily, not a full calendar
   // month yet) — included but flagged so renderCacChart can mark its bar as partial/to-date.
-  const anchorMonth = end.slice(0, 7);
+  const anchorMonth = range.anchor.slice(0, 7);
   const cacTrendNote = limitationNote(
     'Monthly CAC trend',
     'New-customer counts are stored per calendar month, so this trend cannot be cut to a partial month. It always shows whole months.'
@@ -379,6 +390,7 @@ async function buildDashboardHtml(env, query = {}) {
     {
       kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart, provenTab: proven.html,
       rangeControls, periodLabel, comparisonLabel, periodName, creativeCaveat,
+      comparisonName: `previous ${days}d`,
       windowNote: coverageNote + windowNote,
       // Plain text (not unavailableNote's <div>) because this is injected inside an inline <span> in
       // the template; phrasing still matches "{label} data is temporarily unavailable" for consistency
@@ -391,6 +403,10 @@ async function buildDashboardHtml(env, query = {}) {
         start, end, days, isCustom,
         snapshotStart: provenSnapshot ? provenSnapshot.dateFrom : null,
         snapshotEnd: provenSnapshot ? provenSnapshot.dateTo : null,
+        // Matching dates are not enough: the server may have rejected the snapshot
+        // for staleness or a superseded metric basis, in which case the tab must
+        // still fetch rather than leave an "unavailable" message on screen.
+        snapshotRendered: proven.counts !== null,
       },
     }
   );

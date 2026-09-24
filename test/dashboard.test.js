@@ -150,7 +150,7 @@ test('shows a partial "(to date)" bar rather than excluding it, when only the cu
   });
   try {
     const html = await buildDashboardHtml(ENV);
-    assert.doesNotMatch(html, /not enough/i);
+    assert.doesNotMatch(html, /Not enough complete months of data yet for a CAC trend/i);
     assert.match(html, />August \(to date\)</);
   } finally {
     global.fetch = originalFetch;

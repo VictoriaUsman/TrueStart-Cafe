@@ -10,6 +10,7 @@ const SECTIONS = {
   periodLabel: 'Sep 1 – Sep 30',
   comparisonLabel: 'Aug 2 – Aug 31',
   periodName: 'last 30d',
+  comparisonName: 'previous 30d',
   kpiTop: '<div class="kpis">TOP</div>',
   googleTab: '<div>GOOGLE</div>',
   metaTab: '<div>META</div>',
@@ -75,7 +76,7 @@ test('throws a descriptive error if a literal marker is missing from the templat
     '<!--INJECT:KPI_TOP--><!--INJECT:GOOGLE_TAB--><!--INJECT:META_TAB--><!--INJECT:OVERVIEW_TAB-->' +
     '<!--INJECT:INSIGHTS_TAB--><!--INJECT:PACKPROD_TAB--><!--INJECT:COHORT_TABLE--><!--INJECT:SUBSCRIPTION_TAB-->' +
     '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><!--INJECT:WINDOW_NOTE--><!--INJECT:PROVEN_TAB--><!--INJECT:RANGE_CONTROLS-->' +
-    '<!--INJECT:CREATIVE_CAVEAT--><!--INJECT:PERIOD_LABEL--><!--INJECT:COMPARISON_LABEL--><!--INJECT:PERIOD_NAME--><script>no literal markers here</script>';
+    '<!--INJECT:CREATIVE_CAVEAT--><!--INJECT:PERIOD_LABEL--><!--INJECT:COMPARISON_LABEL--><!--INJECT:PERIOD_NAME--><!--INJECT:COMPARISON_NAME--><script>no literal markers here</script>';
   assert.throws(
     () => injectIntoHtml(templateWithHtmlMarkersOnly, SECTIONS, LITERALS),
     /Template marker \/\*INJECT:DATA\*\/ not found — has lib\/template\.html drifted\?/
