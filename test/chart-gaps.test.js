@@ -12,10 +12,12 @@ const readTemplate = () => require('fs').readFileSync(require.resolve('../lib/te
 // --- ROAS series ----------------------------------------------------------
 
 test('a day with spend but no synced sales is a gap, not a zero ROAS', () => {
+  // Google reports on both days so only Shopify's second day is missing, which
+  // isolates the sales gap from the all-sources-missing case below.
   const { RS } = buildDailyRoasSeries({
     shopifyDailyRows: [{ Day: '2026-09-01', 'Total sales': '400' }],
     metaDailyRows: [{ Day: '2026-09-01', 'Amount spent (GBP)': '100' }, { Day: '2026-09-02', 'Amount spent (GBP)': '100' }],
-    googleDailyRows: [],
+    googleDailyRows: [{ Day: '2026-09-01', Cost: '0' }, { Day: '2026-09-02', Cost: '0' }],
   });
   assert.deepEqual(RS, [4, null]);
   assert.ok(!RS.includes(0), 'a missing sales day must not plot as 0');
@@ -106,4 +108,61 @@ test('the rewritten heading uses the same glyph the server rendered', () => {
   // eslint-disable-next-line no-eval
   const rendered = eval(`'${escaped}'`);
   assert.ok(rendered.startsWith('🛑 KILL'), `expected the stop glyph, got ${JSON.stringify(rendered)}`);
+});
+
+// --- Fourth review round: spend coverage and a complete calendar axis ------
+
+test('a source with no rows at all makes blended ROAS unavailable, not inflated', () => {
+  // £1,000 sales against £100 Meta spend with Google missing reported 10x,
+  // because an unsynced source was summed as £0 of spend.
+  const { RS } = buildDailyRoasSeries({
+    shopifyDailyRows: [{ Day: '2026-09-01', 'Total sales': '1000' }],
+    metaDailyRows: [{ Day: '2026-09-01', 'Amount spent (GBP)': '100' }],
+    googleDailyRows: [],
+  });
+  assert.deepEqual(RS, [null]);
+  assert.ok(!RS.includes(10), 'missing Google spend must not inflate ROAS to 10x');
+});
+
+test('a confirmed zero-spend day is distinguished from an unsynced one', () => {
+  // Google reports £0 on the 2nd, so that day is known and spend is Meta's alone.
+  // The 3rd lies outside Google's reporting span, so it is unknown.
+  const { RS } = buildDailyRoasSeries({
+    shopifyDailyRows: [
+      { Day: '2026-09-01', 'Total sales': '400' },
+      { Day: '2026-09-02', 'Total sales': '400' },
+      { Day: '2026-09-03', 'Total sales': '400' },
+    ],
+    metaDailyRows: [
+      { Day: '2026-09-01', 'Amount spent (GBP)': '100' },
+      { Day: '2026-09-02', 'Amount spent (GBP)': '100' },
+      { Day: '2026-09-03', 'Amount spent (GBP)': '100' },
+    ],
+    googleDailyRows: [{ Day: '2026-09-01', Cost: '100' }, { Day: '2026-09-02', Cost: '0' }],
+  });
+  assert.deepEqual(RS, [2, 4, null]);
+});
+
+test('a day missing from every source still occupies the axis as a gap', () => {
+  // Sep 1-3 with nothing on the 2nd used to yield two points joined across the
+  // hole, hiding it. The axis must show three days, the middle one empty.
+  const { RS, LB } = buildDailyRoasSeries({
+    shopifyDailyRows: [{ Day: '2026-09-01', 'Total sales': '400' }, { Day: '2026-09-03', 'Total sales': '400' }],
+    metaDailyRows: [{ Day: '2026-09-01', 'Amount spent (GBP)': '100' }, { Day: '2026-09-03', 'Amount spent (GBP)': '100' }],
+    googleDailyRows: [{ Day: '2026-09-01', Cost: '0' }, { Day: '2026-09-03', Cost: '0' }],
+    start: '2026-09-01', end: '2026-09-03',
+  });
+  assert.equal(RS.length, 3);
+  assert.equal(LB.length, 3);
+  assert.deepEqual(LB, ['Sep 1', 'Sep 2', 'Sep 3']);
+  assert.equal(RS[1], null, 'the missing day must be a gap, not absent from the axis');
+});
+
+test('the axis is filled even without an explicit range', () => {
+  const { LB } = buildDailyRoasSeries({
+    shopifyDailyRows: [{ Day: '2026-09-01', 'Total sales': '400' }, { Day: '2026-09-04', 'Total sales': '400' }],
+    metaDailyRows: [{ Day: '2026-09-01', 'Amount spent (GBP)': '100' }, { Day: '2026-09-04', 'Amount spent (GBP)': '100' }],
+    googleDailyRows: [{ Day: '2026-09-01', Cost: '0' }, { Day: '2026-09-04', Cost: '0' }],
+  });
+  assert.deepEqual(LB, ['Sep 1', 'Sep 2', 'Sep 3', 'Sep 4']);
 });

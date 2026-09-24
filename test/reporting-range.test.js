@@ -180,11 +180,33 @@ test('coverage reports a source that stops before the window ends', () => {
   assert.equal(c.missingAfter, '2026-09-06');
 });
 
-test('coverage passes when the source spans the whole window', () => {
-  const rows = [{ Day: '2026-08-30' }, { Day: '2026-09-11' }];
+test('coverage passes only when every day in the window is present', () => {
+  // Spanning the window at its endpoints is not the same as covering it: these
+  // two rows sit either side of the range and cover none of it.
+  const strad = describeCoverage([{ Day: '2026-08-30' }, { Day: '2026-09-11' }],
+    { dateKey: 'Day', start: '2026-09-01', end: '2026-09-10', toIsoDate });
+  assert.equal(strad.complete, false);
+  assert.equal(strad.missingWithin, 10);
+
+  const rows = [];
+  for (let d = 1; d <= 10; d += 1) rows.push({ Day: `2026-09-${String(d).padStart(2, '0')}` });
+  const full = describeCoverage(rows, { dateKey: 'Day', start: '2026-09-01', end: '2026-09-10', toIsoDate });
+  assert.equal(full.complete, true);
+  assert.equal(full.missingWithin, 0);
+  assert.equal(full.empty, false);
+});
+
+test('a hole in the middle is not reported as complete coverage', () => {
+  const rows = [];
+  for (let d = 1; d <= 10; d += 1) {
+    if (d === 5) continue; // the day an endpoint-only check would miss
+    rows.push({ Day: `2026-09-${String(d).padStart(2, '0')}` });
+  }
   const c = describeCoverage(rows, { dateKey: 'Day', start: '2026-09-01', end: '2026-09-10', toIsoDate });
-  assert.equal(c.complete, true);
-  assert.equal(c.empty, false);
+  assert.equal(c.complete, false);
+  assert.equal(c.missingWithin, 1);
+  assert.equal(c.missingBefore, null);
+  assert.equal(c.missingAfter, null);
 });
 
 test('an empty source is flagged as empty rather than as covering nothing badly', () => {
