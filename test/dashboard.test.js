@@ -23,7 +23,10 @@ const CSV_BY_URL = {
   [ENV.SHEET_CSV_URL_META_DAILY]: 'Campaign name,Day,Impressions,Amount spent (GBP),Link clicks,Purchases,Purchases conversion value,Purchase ROAS,Reporting starts,Reporting ends\nK-TS_UK_BOF-PROVEN,2026-08-01,1000,100,50,25,400,4,2026-08-01,2026-08-01\nK-TS_UK_BOF-PROVEN,2026-06-15,500,3000,25,12,200,4,2026-06-15,2026-06-15\n',
   [ENV.SHEET_CSV_URL_SHOPIFY_DAILY]: 'Day,Orders,Gross sales,Discounts,Sales reversals,Net sales,Shipping charges,Duties,Additional fees,Taxes,Total sales\n01-08-2026,50,1000,0,0,1000,0,0,0,0,1000\n',
   [ENV.SHEET_CSV_URL_NEW_RETURNING]: 'New or returning customer,Customers\nNew,5000\nReturning,3000\n',
-  [ENV.SHEET_CSV_URL_COHORT]: 'Month,Months since first purchase,Customers,Customer retention rate,Customers in cohort\n2026-01-08,0,100,1,100\n',
+  // Cohorts are now filtered to the acquisition months overlapping the selected
+  // range. The fixture's day-level sources end 2026-08-01, so the default window is
+  // Jul 3 – Aug 1 and this cohort must sit inside it to be rendered at all.
+  [ENV.SHEET_CSV_URL_COHORT]: 'Month,Months since first purchase,Customers,Customer retention rate,Customers in cohort\n2026-08-01,0,100,1,100\n',
   [ENV.SHEET_CSV_URL_SHOPIFY_NEW_CUSTOMERS_MONTHLY]: 'Month,New customers,Returning customers\n2026-06-01,200,80\n2026-08-01,50,20\n',
 };
 
@@ -81,8 +84,8 @@ test('renders a real Cumulative LTV table (estimated from Cohort retention rate 
   global.fetch = mockFetchAllOk();
   try {
     const html = await buildDashboardHtml(ENV);
-    // Jan 2026 cohort, M0 retention 100% (default) × £20 AOV (£1000 net sales / 50 orders) = £20.
-    assert.match(html, /Jan 2026/);
+    // Aug 2026 cohort, M0 retention 100% (default) × £20 AOV (£1000 net sales / 50 orders) = £20.
+    assert.match(html, /Aug 2026/);
     assert.match(html, />£20</);
     assert.doesNotMatch(html, /Cumulative LTV.{0,20}is not yet available/s);
   } finally {

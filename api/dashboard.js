@@ -143,6 +143,19 @@ async function buildDashboardHtml(env, query = {}) {
   const metaCoverage = coverage(metaDaily.rows);
   const googleCoverage = coverage(googleDaily.rows);
 
+  // The comparison period needs its own check. A delta against a period the
+  // source never covered is not a performance change, it is missing history
+  // wearing an arrow.
+  const prevCoverage = (rows) => describeCoverage(rows, { dateKey: 'Day', start: prevStart, end: prevEnd, toIsoDate });
+  const shopifyPrevCoverage = prevCoverage(shopifyDaily.rows);
+  const metaPrevCoverage = prevCoverage(metaDaily.rows);
+  const googlePrevCoverage = prevCoverage(googleDaily.rows);
+  const comparable = (cur, prev) => cur.complete && prev.complete;
+  const shopifyComparable = comparable(shopifyCoverage, shopifyPrevCoverage);
+  const metaComparable = comparable(metaCoverage, metaPrevCoverage);
+  const googleComparable = comparable(googleCoverage, googlePrevCoverage);
+  const merComparable = shopifyComparable && metaComparable && googleComparable;
+
   const shortfall = (label, c) => {
     if (c.empty) return `${label} has no dated rows at all.`;
     if (c.missingBefore && c.missingAfter) return `${label} only covers ${c.first} to ${c.last}.`;
@@ -202,10 +215,11 @@ async function buildDashboardHtml(env, query = {}) {
     },
     { newCustomers: 0, returningCustomers: 0 }
   );
-  // The new-vs-returning source is synced over a 90-day trailing window (sync-shopify.js's
-  // WINDOW_DAYS) — CAC's spend must be summed over that same window, not the 30-day KPI window,
-  // or the ratio's two halves refer to different periods (30d spend ÷ 90d customers).
-  const cacWindow = windowBounds(end, 90);
+  // The new-vs-returning source is an undated trailing-90-day total that always
+  // means "as of the latest sync". So CAC's spend window is anchored to the data
+  // anchor, NOT to the selected range: selecting a historical range would
+  // otherwise divide that period's spend by today's customer count.
+  const cacWindow = windowBounds(range.anchor, 90);
   const cacMetaSpend = sumInWindow(metaDaily.rows, { dateKey: 'Day', valueKey: 'Amount spent (GBP)', start: cacWindow.start, end: cacWindow.end });
   const cacGoogleSpend = sumInWindow(googleDaily.rows, { dateKey: 'Day', valueKey: 'Cost', start: cacWindow.start, end: cacWindow.end });
   const cacValue = cac({ metaSpend: cacMetaSpend, googleSpend: cacGoogleSpend, newCustomers: newReturningTotals.newCustomers });
@@ -219,20 +233,22 @@ async function buildDashboardHtml(env, query = {}) {
   const cacOk = metaDaily.ok && googleDaily.ok && newReturning.ok;
   const kpiRowNeeded = dayLevelOk || cacOk || creatives.ok;
   const P = cardPeriod;
+  // Shown instead of an arrow when a period is only partly covered.
+  const incomparableCaption = { text: 'no comparison — incomplete history', style: 'color:#9aa0aa' };
 
   const kpiTop = kpiRowNeeded
     ? renderKpiRow([
         dayLevelOk
-          ? { icon: `◐ BLENDED · ${P}`, big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) }
+          ? { icon: `◐ BLENDED · ${P}`, big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: merComparable ? deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) : incomparableCaption }
           : { icon: `◐ BLENDED · ${P}`, big: '—', cap: 'ROAS / MER — data unavailable' },
         dayLevelOk
-          ? { icon: `ⓕ META · ${P}`, big: formatMoneyK(metaSpend), cap: 'Spend', chg: deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
+          ? { icon: `ⓕ META · ${P}`, big: formatMoneyK(metaSpend), cap: 'Spend', chg: metaComparable ? deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) : incomparableCaption }
           : { icon: `ⓕ META · ${P}`, big: '—', cap: 'Spend — data unavailable' },
         dayLevelOk
-          ? { icon: `Ⓖ GOOGLE · ${P}`, big: formatMoneyK(googleSpend), cap: 'Cost', chg: deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
+          ? { icon: `Ⓖ GOOGLE · ${P}`, big: formatMoneyK(googleSpend), cap: 'Cost', chg: googleComparable ? deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) : incomparableCaption }
           : { icon: `Ⓖ GOOGLE · ${P}`, big: '—', cap: 'Cost — data unavailable' },
         dayLevelOk
-          ? { icon: `🛍 SHOPIFY · ${P}`, big: formatMoneyK(shopifySales), cap: 'Total sales', chg: deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) }
+          ? { icon: `🛍 SHOPIFY · ${P}`, big: formatMoneyK(shopifySales), cap: 'Total sales', chg: shopifyComparable ? deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) : incomparableCaption }
           : { icon: `🛍 SHOPIFY · ${P}`, big: '—', cap: 'Total sales — data unavailable' },
         cacOk
           ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · fixed 90-day window — not the selected range' }
@@ -240,7 +256,9 @@ async function buildDashboardHtml(env, query = {}) {
         proven.counts !== null
           ? {
               icon: '🛑 KILL · last 7 days', big: String(proven.counts.KILL), bigColor: '#C0392B',
-              cap: 'BOF ads meeting their campaign kill rules',
+              cap: provenSnapshot && (provenSnapshot.dateFrom !== start || provenSnapshot.dateTo !== end)
+                ? `BOF kill rules · ${formatShortLabel(provenSnapshot.dateFrom)} – ${formatShortLabel(provenSnapshot.dateTo)}, not the selected range`
+                : 'BOF ads meeting their campaign kill rules',
             }
           : { icon: '🛑 KILL · last 7 days', big: '—', cap: '7-day evaluation unavailable' },
       ])
@@ -280,12 +298,24 @@ async function buildDashboardHtml(env, query = {}) {
 
   // Computed once and reused by both the Cohort tab and the Subscription tab's Cumulative LTV
   // estimate (retention rate × AOV), so the two sections can never disagree on cohort shape.
-  const cohortTableData = cohort.ok ? buildCohortTable(cohort.rows) : [];
+  const allCohorts = cohort.ok ? buildCohortTable(cohort.rows) : [];
+  // Acquisition months that overlap the selection, which is what the caption claims.
+  const startMonth = start.slice(0, 7);
+  const endMonth = end.slice(0, 7);
+  const cohortTableData = allCohorts.filter((c) => c.monthKey >= startMonth && c.monthKey <= endMonth);
+  const cohortsExcluded = allCohorts.length - cohortTableData.length;
   const cohortNote = limitationNote(
     'Cohort & LTV',
-    `Cohorts are monthly acquisition groups, so they cannot be cut to ${periodLabel}. Months overlapping the selection are shown, and each row follows that cohort for its full lifetime to date — not only the selected days.`
+    `Cohorts are monthly acquisition groups, so they cannot be cut to exact days. Showing the ${cohortTableData.length} cohort(s) acquired in months overlapping ${periodLabel}` +
+    `${cohortsExcluded > 0 ? ` (${cohortsExcluded} outside it hidden)` : ''}. Each row follows its cohort for its full lifetime to date, not only the selected days.`
   );
-  const cohortTable = cohort.ok ? cohortNote + renderCohortTable(cohortTableData) : unavailableNote('Cohort');
+  // An empty result after filtering is a real answer, not a failure — say so rather
+  // than rendering a bare header row that reads as a broken table.
+  const cohortTable = !cohort.ok
+    ? unavailableNote('Cohort')
+    : cohortTableData.length === 0
+      ? cohortNote + `<div class="note">No customer cohort was acquired in a month overlapping ${periodLabel}. Widen the range to see cohort retention and LTV.</div>`
+      : cohortNote + renderCohortTable(cohortTableData);
 
   const aov = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Net sales', start, end }) /
     (sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Orders', start, end }) || 1);
@@ -309,6 +339,10 @@ async function buildDashboardHtml(env, query = {}) {
     : unavailableNote('Subscription & LTV');
 
   const { RS, LB } = buildDailyRoasSeries({ shopifyDailyRows: shopifyDaily.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows, start, end });
+  const { RS: PRS } = buildDailyRoasSeries({
+    shopifyDailyRows: shopifyDaily.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows,
+    start: prevStart, end: prevEnd,
+  });
 
   // The month containing the anchor date is still in progress (synced daily, not a full calendar
   // month yet) — included but flagged so renderCacChart can mark its bar as partial/to-date.
@@ -344,14 +378,21 @@ async function buildDashboardHtml(env, query = {}) {
   const html = injectDashboard(
     {
       kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart, provenTab: proven.html,
-      rangeControls, periodLabel, comparisonLabel, periodName,
+      rangeControls, periodLabel, comparisonLabel, periodName, creativeCaveat,
       windowNote: coverageNote + windowNote,
       // Plain text (not unavailableNote's <div>) because this is injected inside an inline <span> in
       // the template; phrasing still matches "{label} data is temporarily unavailable" for consistency
       // with the other sections' degraded-state copy.
       stockStatus: stock.ok ? `live · fetched ${new Date(stock.snap.asOf).toLocaleString('en-GB')}` : 'Stock data is temporarily unavailable — please refresh shortly.',
     },
-    { DATA: data, RS, LB, STK_SNAP: stock.snap, RANGE: { start, end, days, isCustom } }
+    {
+      DATA: data, RS, LB, PRS, STK_SNAP: stock.snap,
+      RANGE: {
+        start, end, days, isCustom,
+        snapshotStart: provenSnapshot ? provenSnapshot.dateFrom : null,
+        snapshotEnd: provenSnapshot ? provenSnapshot.dateTo : null,
+      },
+    }
   );
 
   return html;

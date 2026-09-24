@@ -140,11 +140,11 @@ tr.tot td{font-weight:800;background:#fafbfc;border-top:2px solid #e7e9ee}
  </section>
  <section class="panel" id="creatives">
   <p class="note">Historical performance and delivery groups. See Creative performance · 7 days for current performance qualification.</p>
-  <h2>All creatives <span style="color:#9aa0aa;font-weight:400;font-size:12px">— <!--INJECT:PERIOD_LABEL--></span></h2><div class="filters"><button class="fbtn active" data-status="All">All (399)</button><button class="fbtn" data-status="TESTING">TESTING (18)</button><button class="fbtn" data-status="Feeder">Feeder (139)</button><button class="fbtn" data-status="STARVED">STARVED (230)</button></div>
+  <h2>All creatives <span style="color:#9aa0aa;font-weight:400;font-size:12px">— <!--INJECT:PERIOD_LABEL--></span></h2><!--INJECT:CREATIVE_CAVEAT--><div class="filters"><button class="fbtn active" data-status="All">All (399)</button><button class="fbtn" data-status="TESTING">TESTING (18)</button><button class="fbtn" data-status="Feeder">Feeder (139)</button><button class="fbtn" data-status="STARVED">STARVED (230)</button></div>
   <div class="card"><table id="t"><thead><tr><th data-k="name">Ad</th><th data-k="stage">Stage</th><th class="n" data-k="spend">Spend</th><th class="n" data-k="impr">Impr</th><th class="n" data-k="purch">Purch</th><th class="n" data-k="cpa">CPA</th><th class="n" data-k="roas">ROAS</th><th data-k="product">Product</th><th data-k="status">Status</th></tr></thead><tbody id="tb"></tbody></table></div>
  </section>
 </div>
-<script>const RANGE=/*INJECT:RANGE*/;const DATA=/*INJECT:DATA*/;const COL={"PROVEN": "#1E8A4C", "TESTING": "#C98A00", "KILL": "#C0392B", "STARVED": "#8a8a8a", "Feeder": "#2b6cb0"};const LB=/*INJECT:LB*/;const RS=/*INJECT:RS*/;
+<script>const RANGE=/*INJECT:RANGE*/;const PRS=/*INJECT:PRS*/;const DATA=/*INJECT:DATA*/;const COL={"PROVEN": "#1E8A4C", "TESTING": "#C98A00", "KILL": "#C0392B", "STARVED": "#8a8a8a", "Feeder": "#2b6cb0"};const LB=/*INJECT:LB*/;const RS=/*INJECT:RS*/;
 let curFilter='All',curSort={k:'spend',asc:false};
 function fmt(x){return x.toLocaleString(undefined,{maximumFractionDigits:0});}
 function render(rows){document.getElementById('tb').innerHTML=rows.map(x=>'<tr><td class="nm">'+x.name+'</td><td>'+x.stage+'</td><td class="n">£'+fmt(x.spend)+'</td><td class="n">'+fmt(x.impr)+'</td><td class="n">'+x.purch+'</td><td class="n">'+(x.cpa?('£'+x.cpa.toFixed(1)):'–')+'</td><td class="n">'+x.roas.toFixed(2)+'</td><td>'+x.product+'</td><td><span class="pill" style="background:'+COL[x.status]+'">'+x.status+'</span></td></tr>').join('');}
@@ -207,8 +207,11 @@ bofBindStatusFilter();
   var status=document.getElementById('bof-range-status');
   var heading=document.getElementById('bof-range-heading');
   if(!container||!RANGE)return;
-  var isDefaultSeven=(!RANGE.isCustom&&RANGE.days===7);
-  if(isDefaultSeven)return;
+  // Fetch unless the server-rendered snapshot already covers exactly the selected
+  // dates. Assuming any 7-day preset matches was wrong: the snapshot's window is
+  // whatever the last successful sync captured, which can lag the selection.
+  var snapshotMatches=(RANGE.snapshotStart===RANGE.start&&RANGE.snapshotEnd===RANGE.end);
+  if(snapshotMatches)return;
   status.textContent='Loading '+RANGE.start+' to '+RANGE.end+'…';
   fetch('/api/bof-range?from='+encodeURIComponent(RANGE.start)+'&to='+encodeURIComponent(RANGE.end))
     .then(function(r){return r.json();})
@@ -225,8 +228,8 @@ bofBindStatusFilter();
 const W=1000,H=300,PL=40,PR=14,PT=14,PB=28,YMAX=6;
 function xy(i,n,v){const x=PL+(W-PL-PR)*(n<=1?0:i/(n-1));const y=PT+(H-PT-PB)*(1-v/YMAX);return[x,y];}
 function pth(arr){let dd='';arr.forEach((v,i)=>{const p=xy(i,arr.length,v);dd+=(i?' L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);});return dd;}
-function drawc(days){var n=RS.length;var cs=Math.max(0,n-days);var c=RS.slice(cs);var l=LB.slice(cs);var ps=Math.max(0,cs-days);var p=RS.slice(ps,cs);let g='';for(let v=0;v<=YMAX;v+=2){const y=(PT+(H-PT-PB)*(1-v/YMAX)).toFixed(1);g+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="#eef0f3"/><text x="'+(PL-8)+'" y="'+(+y+3)+'" text-anchor="end" font-size="11" fill="#9aa0aa">'+v.toFixed(1)+'</text>';}let xl='';const step=Math.ceil(l.length/8);l.forEach((lab,i)=>{if(i%step===0||i===l.length-1){const x=xy(i,l.length,0)[0];xl+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9aa0aa">'+lab+'</text>';}});let ad=pth(c);const x0=xy(0,c.length,0)[0],xn=xy(c.length-1,c.length,0)[0],yb=(H-PB).toFixed(1);ad+=' L'+xn.toFixed(1)+' '+yb+' L'+x0.toFixed(1)+' '+yb+' Z';var pv=(p.length===c.length)?('<path d="'+pth(p)+'" fill="none" stroke="#b9bde8" stroke-width="2.2" stroke-dasharray="5 4"/>'):'';let pts='';c.forEach((v,i)=>{const xy0=xy(i,c.length,v);const x=xy0[0].toFixed(1),y=xy0[1].toFixed(1);pts+='<circle cx="'+x+'" cy="'+y+'" r="9" fill="transparent"><title>'+l[i]+': '+v.toFixed(2)+'x ROAS</title></circle><circle cx="'+x+'" cy="'+y+'" r="2.5" fill="#5b5be6" stroke="#fff" stroke-width="1" pointer-events="none"/>';});document.getElementById('chart').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet">'+g+'<path d="'+ad+'" fill="rgba(91,91,230,.08)"/>'+pv+'<path d="'+pth(c)+'" fill="none" stroke="#5b5be6" stroke-width="2.4" stroke-linejoin="round"/>'+pts+xl+'</svg>';}
-drawc(30);
+function drawc(){var c=RS;var l=LB;var p=PRS;let g='';for(let v=0;v<=YMAX;v+=2){const y=(PT+(H-PT-PB)*(1-v/YMAX)).toFixed(1);g+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="#eef0f3"/><text x="'+(PL-8)+'" y="'+(+y+3)+'" text-anchor="end" font-size="11" fill="#9aa0aa">'+v.toFixed(1)+'</text>';}let xl='';const step=Math.ceil(l.length/8);l.forEach((lab,i)=>{if(i%step===0||i===l.length-1){const x=xy(i,l.length,0)[0];xl+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9aa0aa">'+lab+'</text>';}});let ad=pth(c);const x0=xy(0,c.length,0)[0],xn=xy(c.length-1,c.length,0)[0],yb=(H-PB).toFixed(1);ad+=' L'+xn.toFixed(1)+' '+yb+' L'+x0.toFixed(1)+' '+yb+' Z';var pv=(p.length===c.length)?('<path d="'+pth(p)+'" fill="none" stroke="#b9bde8" stroke-width="2.2" stroke-dasharray="5 4"/>'):'';let pts='';c.forEach((v,i)=>{const xy0=xy(i,c.length,v);const x=xy0[0].toFixed(1),y=xy0[1].toFixed(1);pts+='<circle cx="'+x+'" cy="'+y+'" r="9" fill="transparent"><title>'+l[i]+': '+v.toFixed(2)+'x ROAS</title></circle><circle cx="'+x+'" cy="'+y+'" r="2.5" fill="#5b5be6" stroke="#fff" stroke-width="1" pointer-events="none"/>';});document.getElementById('chart').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet">'+g+'<path d="'+ad+'" fill="rgba(91,91,230,.08)"/>'+pv+'<path d="'+pth(c)+'" fill="none" stroke="#5b5be6" stroke-width="2.4" stroke-linejoin="round"/>'+pts+xl+'</svg>';}
+drawc();
 document.querySelectorAll('.db[data-d]').forEach(b=>b.onclick=()=>{const dd=+b.dataset.d;document.querySelectorAll('.db[data-d]').forEach(x=>x.classList.remove('active'));b.classList.add('active');drawc(dd);});
 /* ---- live Shopify stock alerts ---- */
 var STK_TOOL='mcp__bedde684-fb7e-4c76-bba9-f83c3df89209__search_products';

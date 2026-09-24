@@ -6,6 +6,7 @@ const { injectDashboard, injectIntoHtml } = require('../lib/template');
 const SECTIONS = {
   provenTab: '<div>PROVEN</div>',
   rangeControls: '<div class="rangebar">RANGE</div>',
+  creativeCaveat: '<div>CREATIVE CAVEAT</div>',
   periodLabel: 'Sep 1 – Sep 30',
   comparisonLabel: 'Aug 2 – Aug 31',
   periodName: 'last 30d',
@@ -27,6 +28,7 @@ const LITERALS = {
   LB: ['Feb 15', 'Feb 16'],
   STK_SNAP: { asOf: '2026-08-31T00:00:00.000Z', products: [] },
   RANGE: { start: '2026-09-01', end: '2026-09-30', days: 30, isCustom: false },
+  PRS: [1.1, 1.2],
 };
 
 test('replaces every HTML comment marker with its section HTML', () => {
@@ -73,7 +75,7 @@ test('throws a descriptive error if a literal marker is missing from the templat
     '<!--INJECT:KPI_TOP--><!--INJECT:GOOGLE_TAB--><!--INJECT:META_TAB--><!--INJECT:OVERVIEW_TAB-->' +
     '<!--INJECT:INSIGHTS_TAB--><!--INJECT:PACKPROD_TAB--><!--INJECT:COHORT_TABLE--><!--INJECT:SUBSCRIPTION_TAB-->' +
     '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><!--INJECT:WINDOW_NOTE--><!--INJECT:PROVEN_TAB--><!--INJECT:RANGE_CONTROLS-->' +
-    '<!--INJECT:PERIOD_LABEL--><!--INJECT:COMPARISON_LABEL--><!--INJECT:PERIOD_NAME--><script>no literal markers here</script>';
+    '<!--INJECT:CREATIVE_CAVEAT--><!--INJECT:PERIOD_LABEL--><!--INJECT:COMPARISON_LABEL--><!--INJECT:PERIOD_NAME--><script>no literal markers here</script>';
   assert.throws(
     () => injectIntoHtml(templateWithHtmlMarkersOnly, SECTIONS, LITERALS),
     /Template marker \/\*INJECT:DATA\*\/ not found — has lib\/template\.html drifted\?/
