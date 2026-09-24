@@ -166,3 +166,87 @@ test('the axis is filled even without an explicit range', () => {
   });
   assert.deepEqual(LB, ['Sep 1', 'Sep 2', 'Sep 3', 'Sep 4']);
 });
+
+// --- Fifth review round: a hole inside a source's span is still a hole -----
+
+// Three days, all sources reporting, so each case below differs only by the one
+// row it removes from the middle.
+const threeDays = (over = {}) => ({
+  shopifyDailyRows: [
+    { Day: '2026-09-01', 'Total sales': '1000' },
+    { Day: '2026-09-02', 'Total sales': '1000' },
+    { Day: '2026-09-03', 'Total sales': '1000' },
+  ],
+  metaDailyRows: [
+    { Day: '2026-09-01', 'Amount spent (GBP)': '100' },
+    { Day: '2026-09-02', 'Amount spent (GBP)': '100' },
+    { Day: '2026-09-03', 'Amount spent (GBP)': '100' },
+  ],
+  googleDailyRows: [
+    { Day: '2026-09-01', Cost: '0' },
+    { Day: '2026-09-02', Cost: '0' },
+    { Day: '2026-09-03', Cost: '0' },
+  ],
+  start: '2026-09-01',
+  end: '2026-09-03',
+  ...over,
+});
+
+test('all three sources reporting gives a value on every day', () => {
+  // The control: without it the three gap tests below could pass on a bug that
+  // nulls everything.
+  const { RS } = buildDailyRoasSeries(threeDays());
+  assert.deepEqual(RS, [10, 10, 10]);
+});
+
+test('a Google row missing mid-span is a gap, not a spend-free spike', () => {
+  const { RS } = buildDailyRoasSeries(threeDays({
+    googleDailyRows: [{ Day: '2026-09-01', Cost: '0' }, { Day: '2026-09-03', Cost: '0' }],
+  }));
+  assert.deepEqual(RS, [10, null, 10]);
+});
+
+test('a Meta row missing mid-span is a gap, not a partial-spend inflation', () => {
+  // Google must spend something here. With Google at £0 a missing Meta row makes
+  // total spend zero, which nulls the day for an unrelated reason and would let
+  // this test pass against the very behaviour it is meant to catch.
+  const googleFifty = [
+    { Day: '2026-09-01', Cost: '50' },
+    { Day: '2026-09-02', Cost: '50' },
+    { Day: '2026-09-03', Cost: '50' },
+  ];
+  const control = buildDailyRoasSeries(threeDays({ googleDailyRows: googleFifty })).RS;
+  assert.deepEqual(control, [6.67, 6.67, 6.67], '£1000 over £150 of spend');
+
+  const { RS } = buildDailyRoasSeries(threeDays({
+    googleDailyRows: googleFifty,
+    metaDailyRows: [
+      { Day: '2026-09-01', 'Amount spent (GBP)': '100' },
+      { Day: '2026-09-03', 'Amount spent (GBP)': '100' },
+    ],
+  }));
+  assert.deepEqual(RS, [6.67, null, 6.67]);
+  assert.ok(!RS.includes(20), 'dividing by Google spend alone would report 20x');
+});
+
+test('a Shopify row missing mid-span is a gap, not a crash to 0x', () => {
+  const { RS } = buildDailyRoasSeries(threeDays({
+    shopifyDailyRows: [
+      { Day: '2026-09-01', 'Total sales': '1000' },
+      { Day: '2026-09-03', 'Total sales': '1000' },
+    ],
+  }));
+  assert.deepEqual(RS, [10, null, 10]);
+  assert.ok(!RS.includes(0), 'a missing sales day must never render as 0x');
+});
+
+test('a row present with zero is honoured as a confirmed zero, unlike an absent row', () => {
+  // The distinction the whole rule rests on: Google reporting £0 on the 2nd
+  // still computes, because a synced zero is knowledge. Only silence is a gap.
+  const withZero = buildDailyRoasSeries(threeDays()).RS;
+  const withAbsence = buildDailyRoasSeries(threeDays({
+    googleDailyRows: [{ Day: '2026-09-01', Cost: '0' }, { Day: '2026-09-03', Cost: '0' }],
+  })).RS;
+  assert.equal(withZero[1], 10);
+  assert.equal(withAbsence[1], null);
+});
