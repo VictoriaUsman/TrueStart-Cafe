@@ -22,14 +22,15 @@ test('computes one blended ROAS value per day, sorted chronologically, with matc
   assert.deepStrictEqual(RS, [2, 3.33]);
 });
 
-test('a day with paid spend but no matching Shopify row gets ROAS 0', () => {
+test('a day with paid spend but no matching Shopify row has no ROAS, not zero', () => {
   const { RS, LB } = buildDailyRoasSeries({
     shopifyDailyRows: [],
     metaDailyRows: [{ Day: '2026-02-15', 'Amount spent (GBP)': '200' }],
     googleDailyRows: [],
   });
   assert.deepStrictEqual(LB, ['Feb 15']);
-  assert.deepStrictEqual(RS, [0]);
+  // The label is kept so the gap is visible on the axis; the value is unknown.
+  assert.deepStrictEqual(RS, [null]);
 });
 
 test('a row with a blank/unparseable date is skipped instead of throwing', () => {
@@ -42,16 +43,18 @@ test('a row with a blank/unparseable date is skipped instead of throwing', () =>
     googleDailyRows: [],
   });
   assert.deepStrictEqual(LB, ['Feb 15']);
-  assert.deepStrictEqual(RS, [0]);
+  // The label is kept so the gap is visible on the axis; the value is unknown.
+  assert.deepStrictEqual(RS, [null]);
 });
 
-test('a day with zero paid spend gets ROAS 0, not Infinity/NaN', () => {
+test('a day with zero paid spend has no ROAS, and is never Infinity/NaN', () => {
   const { RS } = buildDailyRoasSeries({
     shopifyDailyRows: [{ Day: '15-02-2026', 'Total sales': '500' }],
     metaDailyRows: [],
     googleDailyRows: [],
   });
-  assert.deepStrictEqual(RS, [0]);
+  assert.deepStrictEqual(RS, [null]);
+  assert.ok(RS.every((v) => v === null || Number.isFinite(v)));
 });
 
 test('parses comma-formatted large sales/spend numbers correctly (Google Sheets CSV export renders e.g. "13,905")', () => {

@@ -265,13 +265,13 @@ async function buildDashboardHtml(env, query = {}) {
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
         proven.counts !== null
           ? {
-              icon: '🛑 KILL · last 7 days', bigId: 'kpi-kill', capId: 'kpi-kill-cap',
+              icon: '🛑 KILL · last 7 days', iconId: 'kpi-kill-icon', bigId: 'kpi-kill', capId: 'kpi-kill-cap',
               big: String(proven.counts.KILL), bigColor: '#C0392B',
               cap: provenSnapshot && (provenSnapshot.dateFrom !== start || provenSnapshot.dateTo !== end)
                 ? `BOF kill rules · ${formatShortLabel(provenSnapshot.dateFrom)} – ${formatShortLabel(provenSnapshot.dateTo)}, not the selected range`
                 : 'BOF ads meeting their campaign kill rules',
             }
-          : { icon: '🛑 KILL · last 7 days', bigId: 'kpi-kill', capId: 'kpi-kill-cap', big: '—', cap: '7-day evaluation unavailable' },
+          : { icon: '🛑 KILL · last 7 days', iconId: 'kpi-kill-icon', bigId: 'kpi-kill', capId: 'kpi-kill-cap', big: '—', cap: '7-day evaluation unavailable' },
       ])
     : unavailableNote('KPI');
 

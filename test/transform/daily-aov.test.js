@@ -26,21 +26,24 @@ test('computes daily AOV for the previous window, aligned by day offset to the c
   assert.deepStrictEqual(previous, [15, 20]);
 });
 
-test('a day with 0 orders gets AOV 0, not Infinity/NaN', () => {
+test('a day with 0 orders has no AOV, and is never Infinity/NaN', () => {
   const { current } = buildDailyAovComparisonSeries({
     shopifyDailyRows: [{ Day: '2026-08-01', 'Net sales': '0', Orders: '0' }],
     start: '2026-08-01', end: '2026-08-01', prevStart: '2026-07-31', prevEnd: '2026-07-31',
   });
-  assert.deepStrictEqual(current, [0]);
+  // null, not 0: no orders means the average is undefined, not zero pounds.
+  assert.deepStrictEqual(current, [null]);
+  assert.ok(current.every((v) => v === null || Number.isFinite(v)));
 });
 
-test('a day missing entirely from shopifyDailyRows gets AOV 0 for both series', () => {
+test('a day missing entirely from shopifyDailyRows is a gap in both series, not zero', () => {
   const { current, previous } = buildDailyAovComparisonSeries({
     shopifyDailyRows: [],
     start: '2026-08-01', end: '2026-08-01', prevStart: '2026-07-31', prevEnd: '2026-07-31',
   });
-  assert.deepStrictEqual(current, [0]);
-  assert.deepStrictEqual(previous, [0]);
+  // Plotting an unsynced day as £0 would draw a collapse that never happened.
+  assert.deepStrictEqual(current, [null]);
+  assert.deepStrictEqual(previous, [null]);
 });
 
 test('parses comma-formatted large net-sales numbers correctly', () => {

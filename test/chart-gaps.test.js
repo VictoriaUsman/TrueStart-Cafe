@@ -1,0 +1,109 @@
+// Third review round: charts were plotting missing history as zero, and the Kill
+// KPI kept a "last 7 days" heading after a custom-range update.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { buildDailyRoasSeries } = require('../lib/transform/daily-roas');
+const { buildDailyAovComparisonSeries } = require('../lib/transform/daily-aov');
+const { renderAovChart } = require('../lib/render/aov-chart');
+const { renderKpiRow } = require('../lib/render/kpis');
+
+const readTemplate = () => require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
+
+// --- ROAS series ----------------------------------------------------------
+
+test('a day with spend but no synced sales is a gap, not a zero ROAS', () => {
+  const { RS } = buildDailyRoasSeries({
+    shopifyDailyRows: [{ Day: '2026-09-01', 'Total sales': '400' }],
+    metaDailyRows: [{ Day: '2026-09-01', 'Amount spent (GBP)': '100' }, { Day: '2026-09-02', 'Amount spent (GBP)': '100' }],
+    googleDailyRows: [],
+  });
+  assert.deepEqual(RS, [4, null]);
+  assert.ok(!RS.includes(0), 'a missing sales day must not plot as 0');
+});
+
+test('a day with sales but no spend is a gap, not a zero ROAS', () => {
+  const { RS } = buildDailyRoasSeries({
+    shopifyDailyRows: [{ Day: '2026-09-01', 'Total sales': '400' }],
+    metaDailyRows: [], googleDailyRows: [],
+  });
+  assert.deepEqual(RS, [null]);
+});
+
+test('ROAS values are never Infinity or NaN', () => {
+  const { RS } = buildDailyRoasSeries({
+    shopifyDailyRows: [{ Day: '2026-09-01', 'Total sales': '400' }],
+    metaDailyRows: [{ Day: '2026-09-02', 'Amount spent (GBP)': '0' }],
+    googleDailyRows: [],
+  });
+  assert.ok(RS.every((v) => v === null || Number.isFinite(v)));
+});
+
+// --- AOV series -----------------------------------------------------------
+
+test('days absent from the source are gaps in both AOV series', () => {
+  const { current, previous } = buildDailyAovComparisonSeries({
+    shopifyDailyRows: [{ Day: '2026-09-02', 'Net sales': '200', Orders: '10' }],
+    start: '2026-09-01', end: '2026-09-02', prevStart: '2026-08-30', prevEnd: '2026-08-31',
+  });
+  assert.deepEqual(current, [null, 20]);
+  assert.deepEqual(previous, [null, null], 'an unsynced comparison period must not plot as £0');
+});
+
+// --- Chart rendering ------------------------------------------------------
+
+test('the AOV line breaks at a gap instead of dropping to the axis', () => {
+  const gapped = renderAovChart({ current: [20, null, 25], previous: [20, 20, 20], labels: ['a', 'b', 'c'] });
+  const solid = renderAovChart({ current: [20, 22, 25], previous: [20, 20, 20], labels: ['a', 'b', 'c'] });
+  const movesIn = (svg) => (svg.match(/d="([^"]*)"[^>]*stroke="#5b5be6"/)[1].match(/M/g) || []).length;
+  // A continuous series is one subpath; a gapped one must be lifted into two.
+  assert.equal(movesIn(solid), 1);
+  assert.equal(movesIn(gapped), 2, 'a gap must start a new subpath rather than draw through the axis');
+});
+
+test('a gap contributes no hover point, so nothing reports £0.00 for a missing day', () => {
+  const html = renderAovChart({ current: [20, null, 25], previous: [null, null, null], labels: ['a', 'b', 'c'] });
+  assert.doesNotMatch(html, /£0\.00/);
+  assert.equal((html.match(/<title>/g) || []).length, 2, 'only the two known days get a tooltip');
+});
+
+test('an all-gap comparison period draws no dashed line and says why', () => {
+  const html = renderAovChart({ current: [20, 25], previous: [null, null], labels: ['a', 'b'] });
+  assert.doesNotMatch(html, /stroke-dasharray/);
+  assert.match(html, /comparison line is broken where the previous period has no synced data/);
+});
+
+test('an entirely unknown series renders a message rather than a flat zero line', () => {
+  const html = renderAovChart({ current: [null, null], previous: [null, null], labels: ['a', 'b'] });
+  assert.match(html, /No daily sales data in this range/);
+});
+
+test('the ROAS chart script skips nulls rather than plotting them', () => {
+  const tpl = readTemplate();
+  // pth() lifts the pen on a gap.
+  assert.match(tpl, /if\(v===null\|\|v===undefined\)\{drawing=false;return;\}/);
+  // The filled area implies continuity, so it is dropped when the series has gaps.
+  assert.match(tpl, /if\(hasGap\)\{ad=''\;\}/);
+  // No marker or tooltip for a day with no value.
+  assert.match(tpl, /if\(v===null\|\|v===undefined\)return;const xy0/);
+});
+
+// --- Kill KPI heading -----------------------------------------------------
+
+test('the Kill card heading is addressable', () => {
+  const html = renderKpiRow([{ icon: '🛑 KILL · last 7 days', iconId: 'kpi-kill-icon', big: '3', cap: 'c' }]);
+  assert.match(html, /<div class="ic" id="kpi-kill-icon">/);
+});
+
+test('the Kill heading is rewritten with the fetched window, not left on seven days', () => {
+  const tpl = readTemplate();
+  assert.match(tpl, /killIcon\.textContent=/);
+  assert.match(tpl, /KILL \\u00b7 '\+d\.dateFrom\+' to '\+d\.dateTo/);
+});
+
+test('the rewritten heading uses the same glyph the server rendered', () => {
+  const tpl = readTemplate();
+  const escaped = tpl.match(/killIcon\.textContent='([^']*)'/)[1];
+  // eslint-disable-next-line no-eval
+  const rendered = eval(`'${escaped}'`);
+  assert.ok(rendered.startsWith('🛑 KILL'), `expected the stop glyph, got ${JSON.stringify(rendered)}`);
+});
