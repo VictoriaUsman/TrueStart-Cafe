@@ -5,6 +5,10 @@ const { injectDashboard, injectIntoHtml } = require('../lib/template');
 
 const SECTIONS = {
   provenTab: '<div>PROVEN</div>',
+  rangeControls: '<div class="rangebar">RANGE</div>',
+  periodLabel: 'Sep 1 – Sep 30',
+  comparisonLabel: 'Aug 2 – Aug 31',
+  periodName: 'last 30d',
   kpiTop: '<div class="kpis">TOP</div>',
   googleTab: '<div>GOOGLE</div>',
   metaTab: '<div>META</div>',
@@ -22,6 +26,7 @@ const LITERALS = {
   RS: [1.5, 2.1],
   LB: ['Feb 15', 'Feb 16'],
   STK_SNAP: { asOf: '2026-08-31T00:00:00.000Z', products: [] },
+  RANGE: { start: '2026-09-01', end: '2026-09-30', days: 30, isCustom: false },
 };
 
 test('replaces every HTML comment marker with its section HTML', () => {
@@ -67,7 +72,8 @@ test('throws a descriptive error if a literal marker is missing from the templat
   const templateWithHtmlMarkersOnly =
     '<!--INJECT:KPI_TOP--><!--INJECT:GOOGLE_TAB--><!--INJECT:META_TAB--><!--INJECT:OVERVIEW_TAB-->' +
     '<!--INJECT:INSIGHTS_TAB--><!--INJECT:PACKPROD_TAB--><!--INJECT:COHORT_TABLE--><!--INJECT:SUBSCRIPTION_TAB-->' +
-    '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><!--INJECT:WINDOW_NOTE--><!--INJECT:PROVEN_TAB--><script>no literal markers here</script>';
+    '<!--INJECT:STOCK_STATUS--><!--INJECT:CAC_CHART--><!--INJECT:WINDOW_NOTE--><!--INJECT:PROVEN_TAB--><!--INJECT:RANGE_CONTROLS-->' +
+    '<!--INJECT:PERIOD_LABEL--><!--INJECT:COMPARISON_LABEL--><!--INJECT:PERIOD_NAME--><script>no literal markers here</script>';
   assert.throws(
     () => injectIntoHtml(templateWithHtmlMarkersOnly, SECTIONS, LITERALS),
     /Template marker \/\*INJECT:DATA\*\/ not found — has lib\/template\.html drifted\?/
@@ -110,13 +116,16 @@ test('escapes "</script>" inside an injected literal so it cannot break out of t
   assert.match(html, /\\u003c\/script>\\u003cscript>alert\(1\)\\u003c\/script>/);
 });
 
-test('the BOF panel has a date range control wired to the range endpoint', () => {
+test('the BOF panel follows the global date filter rather than owning its own', () => {
   const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
-  assert.match(original, /id="bof-range-default"/);
-  assert.match(original, /id="bof-range-custom"/);
-  assert.match(original, /id="bof-range-from"/);
-  assert.match(original, /id="bof-range-to"/);
-  assert.match(original, /\/api\/bof-range\?from='\+encodeURIComponent/);
+  // A Last 7 days shortcut remains for the regular review, but it drives the
+  // page-level filter instead of a second, competing range control.
+  assert.match(original, /id="bof-range-default" href="\?days=7#tab=proven"/);
+  assert.match(original, /This tab follows the date filter at the top of the page/);
+  assert.doesNotMatch(original, /id="bof-range-apply"/);
+  assert.doesNotMatch(original, /id="bof-range-from"/);
+  // It still fetches, but for whatever the global range resolved to.
+  assert.match(original, /\/api\/bof-range\?from='\+encodeURIComponent\(RANGE\.start\)/);
 });
 
 test('the injected BOF table lives in a container the range fetch can replace', () => {
@@ -130,14 +139,13 @@ test('a failed range fetch leaves the seven-day table in place', () => {
   assert.match(original, /if\(!d\.ok\)\{status\.textContent=d\.error;return;\}/);
 });
 
-test('a stale range fetch cannot overwrite a view the user has since navigated away from', () => {
+test('a failed BOF range fetch leaves the server-rendered table in place', () => {
   const original = require('fs').readFileSync(require.resolve('../lib/template.html'), 'utf8');
-  // A per-request token, bumped on every Apply and on every return to the default view, guards
-  // both the success and failure callbacks so a late-resolving fetch can no longer clobber
-  // whatever the user is looking at now.
-  assert.match(original, /var bofReqId=0;/);
-  assert.match(original, /bofReqId\+\+;/);
-  assert.match(original, /var reqId=\+\+bofReqId;/);
-  const guardCount = (original.match(/if\(reqId!==bofReqId\)return;/g) || []).length;
-  assert.strictEqual(guardCount, 2, 'the stale-response guard must appear in both the .then and .catch callbacks');
+  // The failure branch sets status text only — it must never touch container.innerHTML,
+  // or a transient Windsor error would blank a table that is already correct on screen.
+  assert.match(original, /if\(!d\.ok\)\{status\.textContent=d\.error;return;\}/);
+  // The stale-response token this tab used to carry is deliberately gone, not lost:
+  // the panel now fires exactly one fetch on load and has no in-page control that can
+  // supersede it, so there is no longer a race for a token to guard.
+  assert.doesNotMatch(original, /bofReqId/);
 });

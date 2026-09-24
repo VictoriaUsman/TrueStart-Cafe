@@ -68,7 +68,9 @@ test('the CAC KPI card sums spend over the same 90-day window as the new-vs-retu
     // Meta+Google spend across BOTH the Aug 1 row (inside the 30d window) and the Jun 15 row
     // (outside 30d, inside 90d) = (100+3000) + (100+1000) = 4200; 4200 / 5000 new customers = £0.84 -> £1.
     // The old 30d-only calc would give (100+100)/5000 = £0.04 -> £0.
-    assert.match(html, /💷 CAC · cost per new customer<\/div><div class="big">£1<\/div><div class="cap">blended · Meta\+Google ÷ new customers \(last 90d\)/);
+    // The £1 is what pins the behaviour: £4000 of 90-day spend ÷ 5000 new customers.
+    // Summing only the 30-day KPI window would give a different figure.
+    assert.match(html, /💷 CAC · cost per new customer<\/div><div class="big">£1<\/div><div class="cap">blended · fixed 90-day window — not the selected range/);
   } finally {
     global.fetch = originalFetch;
   }
@@ -272,7 +274,7 @@ test('the KPI window note shows the real current 30-day windows, not a hardcoded
   try {
     const html = await buildDashboardHtml(ENV);
     assert.doesNotMatch(html, /Jul 20 – Aug 18/); // the old hardcoded snapshot dates
-    assert.match(html, /KPI cards above show the <b>last 30 days \([A-Za-z]{3} \d{1,2} – [A-Za-z]{3} \d{1,2}\)<\/b>/);
+    assert.match(html, /Showing <b>last 30 days \([A-Za-z]{3} \d{1,2} – [A-Za-z]{3} \d{1,2}\)<\/b>/);
   } finally {
     global.fetch = originalFetch;
   }

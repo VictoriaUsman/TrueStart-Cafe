@@ -27,7 +27,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}td.nm{font-family:u
 .proven-card{background:#f2fbf5;border-color:#b7e3c6}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px}.fbtn{padding:5px 13px;border:1px solid #d0d3da;border-radius:20px;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#444}.fbtn.active{background:#111;color:#fff;border-color:#111}
 .two{display:flex;gap:18px;flex-wrap:wrap}.two>div{flex:1;min-width:330px}
-.dates{display:flex;gap:8px;margin:4px 0 12px}.db{padding:6px 13px;border:1px solid #d0d3da;border-radius:20px;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#444}.db.active{background:#5b5be6;color:#fff;border-color:#5b5be6}
+.dates{display:flex;gap:8px;margin:4px 0 12px}.rangebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}.rangebar a.db{text-decoration:none;display:inline-block}.rangebar form{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0}.rangebar input[type=date]{padding:5px 8px;border:1px solid #d0d3da;border-radius:8px;font-size:12px;font-weight:600;color:#444;font-family:inherit}.rangebar label{font-size:12px;font-weight:600;color:#6b7280}.db{padding:6px 13px;border:1px solid #d0d3da;border-radius:20px;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#444}.db.active{background:#5b5be6;color:#fff;border-color:#5b5be6}
 #proven label{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#444}
 #proven input[type="date"],#performance-status{font-family:inherit;font-size:12px;font-weight:600;line-height:1.5;color:#444;background:#fff;border:1px solid #d0d3da;border-radius:8px;padding:6px 10px;min-height:34px;max-width:100%;color-scheme:light}
 #proven input[type="date"]:focus-visible,#performance-status:focus-visible{outline:2px solid #5b5be6;outline-offset:2px;border-color:#5b5be6}
@@ -60,9 +60,10 @@ tr.tot td{font-weight:800;background:#fafbfc;border-top:2px solid #e7e9ee}
 .sku{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6b7280}
 .muted{color:#9aa0aa}
 </style></head><body>
-<header><div class="wrap"><h1>TrueStart — Paid Media Dashboard</h1><div class="sub">Account blended (Shopify-verified) + Meta creative performance · Jul 20 – Aug 18 · deltas vs previous 30d (Jun 20 – Jul 19)</div></div></header>
+<header><div class="wrap"><h1>TrueStart — Paid Media Dashboard</h1><div class="sub">Account blended (Shopify-verified) + Meta creative performance · <!--INJECT:PERIOD_LABEL--> · deltas vs previous 30d (<!--INJECT:COMPARISON_LABEL-->)</div></div></header>
 <div class="wrap">
- <!--INJECT:KPI_TOP-->
+ <!--INJECT:RANGE_CONTROLS-->
+  <!--INJECT:KPI_TOP-->
  <div style="font-size:12px;color:#6b7280;margin:12px 2px 0"><!--INJECT:WINDOW_NOTE--></div>
  <div class="tabs">
   <button class="tab" data-tab="perf">Performance</button>
@@ -79,17 +80,17 @@ tr.tot td{font-weight:800;background:#fafbfc;border-top:2px solid #e7e9ee}
  </div>
  <section class="panel" id="perf">
   <h2>Master ROAS <span style="color:#9aa0aa;font-weight:400;font-size:12px">— blended, Shopify-verified, by day</span></h2>
-  <div class="dates"><button class="db" data-d="7">Last 7 days</button><button class="db active" data-d="30">Last 30 days</button><button class="db" data-d="90">Last 90 days</button></div>
-  <div style="font-size:11.5px;color:#9aa0aa;margin:-4px 0 8px">This 7/30/90 toggle changes <b>this chart only</b>; the KPI cards and other tabs are fixed to their labelled window. The <b>dashed line</b> is the same number of days immediately before the solid line (on 30d, the prior 30 days: Jun 20 – Jul 19) — so you can see whether ROAS is up or down versus the period before.</div>
+  
+  
   <div class="card p"><div id="chart"><svg viewBox="0 0 1000 300" width="100%" preserveAspectRatio="xMidYMid meet"><line x1="40" y1="272.0" x2="986" y2="272.0" stroke="#eef0f3"></line><text x="32" y="275" text-anchor="end" font-size="11" fill="#9aa0aa">0.0</text><line x1="40" y1="186.0" x2="986" y2="186.0" stroke="#eef0f3"></line><text x="32" y="189" text-anchor="end" font-size="11" fill="#9aa0aa">2.0</text><line x1="40" y1="100.0" x2="986" y2="100.0" stroke="#eef0f3"></line><text x="32" y="103" text-anchor="end" font-size="11" fill="#9aa0aa">4.0</text><line x1="40" y1="14.0" x2="986" y2="14.0" stroke="#eef0f3"></line><text x="32" y="17" text-anchor="end" font-size="11" fill="#9aa0aa">6.0</text><path d="M40.0 166.2 L72.6 174.0 L105.2 142.6 L137.9 127.5 L170.5 137.0 L203.1 142.6 L235.7 158.9 L268.3 130.1 L301.0 131.0 L333.6 109.0 L366.2 149.4 L398.8 94.8 L431.4 146.0 L464.1 134.0 L496.7 104.7 L529.3 114.6 L561.9 177.4 L594.6 184.3 L627.2 148.2 L659.8 174.4 L692.4 175.3 L725.0 167.5 L757.7 164.9 L790.3 189.9 L822.9 169.7 L855.5 195.0 L888.1 203.6 L920.8 187.3 L953.4 177.4 L986.0 209.7 L986.0 272.0 L40.0 272.0 Z" fill="rgba(91,91,230,.08)"></path><path d="M40.0 230.3 L72.6 223.8 L105.2 202.8 L137.9 227.7 L170.5 227.7 L203.1 208.4 L235.7 223.8 L268.3 218.7 L301.0 229.0 L333.6 157.6 L366.2 198.9 L398.8 182.1 L431.4 194.2 L464.1 169.7 L496.7 189.9 L529.3 180.8 L561.9 190.3 L594.6 198.5 L627.2 217.4 L659.8 209.7 L692.4 201.9 L725.0 208.4 L757.7 217.4 L790.3 190.3 L822.9 201.1 L855.5 194.6 L888.1 194.2 L920.8 194.2 L953.4 222.1 L986.0 177.8" fill="none" stroke="#b9bde8" stroke-width="2.2" stroke-dasharray="5 4"></path><path d="M40.0 166.2 L72.6 174.0 L105.2 142.6 L137.9 127.5 L170.5 137.0 L203.1 142.6 L235.7 158.9 L268.3 130.1 L301.0 131.0 L333.6 109.0 L366.2 149.4 L398.8 94.8 L431.4 146.0 L464.1 134.0 L496.7 104.7 L529.3 114.6 L561.9 177.4 L594.6 184.3 L627.2 148.2 L659.8 174.4 L692.4 175.3 L725.0 167.5 L757.7 164.9 L790.3 189.9 L822.9 169.7 L855.5 195.0 L888.1 203.6 L920.8 187.3 L953.4 177.4 L986.0 209.7" fill="none" stroke="#5b5be6" stroke-width="2.4" stroke-linejoin="round"></path><text x="40.0" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Jul 20</text><text x="170.5" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Jul 24</text><text x="301.0" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Jul 28</text><text x="431.4" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Aug 1</text><text x="561.9" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Aug 5</text><text x="692.4" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Aug 9</text><text x="822.9" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Aug 13</text><text x="953.4" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Aug 17</text><text x="986.0" y="292" text-anchor="middle" font-size="10" fill="#9aa0aa">Aug 18</text></svg></div><div class="cl"><span><i></i>ROAS (blended), this period</span> &nbsp;&nbsp; <span><i class="p"></i>Same-length period immediately before</span></div></div>
   <h2 style="margin-top:26px">Cost per new customer <span style="color:#9aa0aa;font-weight:400;font-size:12px">— blended (Meta+Google ÷ new customers)</span></h2><!--INJECT:CAC_CHART-->
  </section>
  <section class="panel" id="google">
-  <h2>Google Ads performance <span style="color:#9aa0aa;font-weight:400;font-size:12px">— by campaign · last 30d (Jul 20 – Aug 18)</span></h2>
+  <h2>Google Ads performance <span style="color:#9aa0aa;font-weight:400;font-size:12px">— by campaign · <!--INJECT:PERIOD_NAME--> (<!--INJECT:PERIOD_LABEL-->)</span></h2>
   <!--INJECT:GOOGLE_TAB-->
  </section>
  <section class="panel active" id="stock">
-  <h2>Stock alerts <span style="color:#9aa0aa;font-weight:400;font-size:12px">— live from Shopify · lowest stock first · pause ads on advertised OOS/low</span></h2>
+  <h2>Stock alerts <span style="color:#9aa0aa;font-weight:400;font-size:12px">— Live inventory — unaffected by date range · lowest stock first · pause ads on advertised OOS/low</span></h2>
   <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 10px">
     <label style="font-size:12.5px;color:#374151;font-weight:600">Low-stock threshold (units): <input id="st_thr" type="number" min="0" value="20" style="width:70px;padding:5px 8px;border:1px solid #d0d3da;border-radius:8px;font-size:13px"></label>
     <span id="st_status" style="font-size:12px;color:#9aa0aa"><!--INJECT:STOCK_STATUS--></span>
@@ -104,19 +105,19 @@ tr.tot td{font-weight:800;background:#fafbfc;border-top:2px solid #e7e9ee}
   <div class="note" style="font-size:12px">Live inventory (lowest-stock 50 active products). "Advertised" = coffee SKUs we run paid media on — when one is OOS or low, pause the matching Meta/Google ads. Negative quantities usually mean "continue selling" is on; verify in Shopify before pausing. Read-only — never changes stock or ads.</div>
  </section>
  <section class="panel" id="subs">
-  <h2>Subscription &amp; LTV <span style="color:#9aa0aa;font-weight:400;font-size:12px">— AOV: last 30d · new vs returning: last 90d · LTV: historical cohorts</span></h2>
+  <h2>Subscription &amp; LTV <span style="color:#9aa0aa;font-weight:400;font-size:12px">— AOV: <!--INJECT:PERIOD_NAME--> · new vs returning: last 90d · LTV: historical cohorts</span></h2>
   <!--INJECT:SUBSCRIPTION_TAB-->
  </section>
  <section class="panel" id="overview">
-  <h2>Funnel split <span style="color:#9aa0aa;font-weight:400;font-size:12px">— our Meta creatives, Jul 20 – Aug 18 (trailing 30 days)</span></h2>
+  <h2>Funnel split <span style="color:#9aa0aa;font-weight:400;font-size:12px">— our Meta creatives, <!--INJECT:PERIOD_LABEL--></span></h2>
   <!--INJECT:OVERVIEW_TAB-->
  </section>
  <section class="panel" id="insights">
-  <h2>What's working <span style="color:#9aa0aa;font-weight:400;font-size:12px">— by angle &amp; persona · Jul 20 – Aug 18 (trailing 30 days)</span></h2>
+  <h2>What's working <span style="color:#9aa0aa;font-weight:400;font-size:12px">— by angle &amp; persona · <!--INJECT:PERIOD_LABEL--></span></h2>
   <!--INJECT:INSIGHTS_TAB-->
  </section>
  <section class="panel" id="packprod">
-  <h2>Pack &amp; Product <span style="color:#9aa0aa;font-weight:400;font-size:12px">— taster / starter, split by product · Jul 20 – Aug 18 (trailing 30 days)</span></h2>
+  <h2>Pack &amp; Product <span style="color:#9aa0aa;font-weight:400;font-size:12px">— taster / starter, split by product · <!--INJECT:PERIOD_LABEL--></span></h2>
   <!--INJECT:PACKPROD_TAB-->
  </section>
  <section class="panel" id="cohort">
@@ -125,41 +126,69 @@ tr.tot td{font-weight:800;background:#fafbfc;border-top:2px solid #e7e9ee}
   <div class="note" style="font-size:12px;color:#555">Each row = customers acquired that month; columns = the % who placed another order in later months. Month 0 = 100% by definition; darker = higher retention.</div>
  </section>
  <section class="panel" id="campaigns">
-  <h2>Meta — campaigns &amp; ads <span style="color:#9aa0aa;font-weight:400;font-size:12px">— by campaign · last 30d (Jul 20 – Aug 18)</span></h2>
+  <h2>Meta — campaigns &amp; ads <span style="color:#9aa0aa;font-weight:400;font-size:12px">— by campaign · <!--INJECT:PERIOD_NAME--> (<!--INJECT:PERIOD_LABEL-->)</span></h2>
   <!--INJECT:META_TAB-->
  </section>
  <section class="panel" id="proven">
   <h2 id="bof-range-heading">Creative performance · 7 days</h2>
   <div class="dates">
-    <button class="db active" id="bof-range-default">Last 7 days</button>
-    <button class="db" id="bof-range-custom">Custom range</button>
-  </div>
-  <div id="bof-range-fields" hidden style="margin:0 0 12px">
-    <label>From <input type="date" id="bof-range-from"></label>
-    <label>To <input type="date" id="bof-range-to"></label>
-    <button class="fbtn" id="bof-range-apply">Apply</button>
+    <a class="db" id="bof-range-default" href="?days=7#tab=proven">Last 7 days</a>
     <span id="bof-range-status" class="note"></span>
   </div>
+  <div class="note">This tab follows the date filter at the top of the page. Use <b>Last 7 days</b> for the regular review — the kill and recovery thresholds are calibrated for a seven-day window.</div>
   <div id="bof-table-container"><!--INJECT:PROVEN_TAB--></div>
  </section>
  <section class="panel" id="creatives">
   <p class="note">Historical performance and delivery groups. See Creative performance · 7 days for current performance qualification.</p>
-  <h2>All creatives <span style="color:#9aa0aa;font-weight:400;font-size:12px">— Jul 20 – Aug 18</span></h2><div class="filters"><button class="fbtn active" data-status="All">All (399)</button><button class="fbtn" data-status="TESTING">TESTING (18)</button><button class="fbtn" data-status="Feeder">Feeder (139)</button><button class="fbtn" data-status="STARVED">STARVED (230)</button></div>
+  <h2>All creatives <span style="color:#9aa0aa;font-weight:400;font-size:12px">— <!--INJECT:PERIOD_LABEL--></span></h2><div class="filters"><button class="fbtn active" data-status="All">All (399)</button><button class="fbtn" data-status="TESTING">TESTING (18)</button><button class="fbtn" data-status="Feeder">Feeder (139)</button><button class="fbtn" data-status="STARVED">STARVED (230)</button></div>
   <div class="card"><table id="t"><thead><tr><th data-k="name">Ad</th><th data-k="stage">Stage</th><th class="n" data-k="spend">Spend</th><th class="n" data-k="impr">Impr</th><th class="n" data-k="purch">Purch</th><th class="n" data-k="cpa">CPA</th><th class="n" data-k="roas">ROAS</th><th data-k="product">Product</th><th data-k="status">Status</th></tr></thead><tbody id="tb"></tbody></table></div>
  </section>
 </div>
-<script>const DATA=/*INJECT:DATA*/;const COL={"PROVEN": "#1E8A4C", "TESTING": "#C98A00", "KILL": "#C0392B", "STARVED": "#8a8a8a", "Feeder": "#2b6cb0"};const LB=/*INJECT:LB*/;const RS=/*INJECT:RS*/;
+<script>const RANGE=/*INJECT:RANGE*/;const DATA=/*INJECT:DATA*/;const COL={"PROVEN": "#1E8A4C", "TESTING": "#C98A00", "KILL": "#C0392B", "STARVED": "#8a8a8a", "Feeder": "#2b6cb0"};const LB=/*INJECT:LB*/;const RS=/*INJECT:RS*/;
 let curFilter='All',curSort={k:'spend',asc:false};
 function fmt(x){return x.toLocaleString(undefined,{maximumFractionDigits:0});}
 function render(rows){document.getElementById('tb').innerHTML=rows.map(x=>'<tr><td class="nm">'+x.name+'</td><td>'+x.stage+'</td><td class="n">£'+fmt(x.spend)+'</td><td class="n">'+fmt(x.impr)+'</td><td class="n">'+x.purch+'</td><td class="n">'+(x.cpa?('£'+x.cpa.toFixed(1)):'–')+'</td><td class="n">'+x.roas.toFixed(2)+'</td><td>'+x.product+'</td><td><span class="pill" style="background:'+COL[x.status]+'">'+x.status+'</span></td></tr>').join('');}
 function redraw(){let rows=curFilter==='All'?DATA.slice():DATA.filter(x=>x.status===curFilter);const k=curSort.k,asc=curSort.asc;rows.sort((a,b)=>{let x=a[k],y=b[k];if(typeof x==='string')return asc?x.localeCompare(y):y.localeCompare(x);return asc?x-y:y-x;});render(rows);document.querySelectorAll('.fbtn').forEach(b=>{const st=b.dataset.status;const count=st==='All'?DATA.length:DATA.filter(x=>x.status===st).length;b.textContent=st+' ('+count+')';b.classList.toggle('active',st===curFilter);});}
 document.querySelectorAll('.fbtn').forEach(b=>b.onclick=()=>{curFilter=b.dataset.status;redraw();});
 document.querySelectorAll('#t th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;curSort={k:k,asc:curSort.k===k?!curSort.asc:true};redraw();});
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');});
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');bofSyncTab(t.dataset.tab);});
+// Applying a date range is a full page load, so the open tab is carried in the URL
+// hash and restored here — otherwise every date change silently dumps the reader
+// back on the first tab.
+function bofSyncTab(name){
+  try{
+    var u=new URL(window.location.href);
+    u.hash=name?('tab='+name):'';
+    window.history.replaceState(null,'',u.toString());
+  }catch(e){}
+  document.querySelectorAll('.rangebar a.db').forEach(function(a){
+    try{var lu=new URL(a.href);lu.hash=name?('tab='+name):'';a.href=lu.toString();}catch(e){}
+  });
+  var hidden=document.getElementById('range-tab');
+  if(hidden)hidden.value=name||'';
+}
+(function(){
+  var m=/(?:^|#|&)tab=([A-Za-z0-9_-]+)/.exec(window.location.hash||'');
+  var name=m&&m[1];
+  var btn=name&&document.querySelector('.tab[data-tab="'+name+'"]');
+  if(btn){btn.click();}
+  else{var active=document.querySelector('.tab.active');bofSyncTab(active?active.dataset.tab:'');}
+})();
+// The GET form cannot put a fragment in the URL itself, so re-attach the open tab
+// after the browser has built the query string.
+(function(){
+  var form=document.getElementById('range-form');
+  if(!form)return;
+  form.addEventListener('submit',function(){
+    var hidden=document.getElementById('range-tab');
+    var name=hidden&&hidden.value;
+    if(!name)return;
+    setTimeout(function(){},0);
+    form.action=form.action.split('#')[0]+'#tab='+name;
+  });
+})();
 document.querySelectorAll('.stab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.stab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.subpanel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.sub).classList.add('active');});
 redraw();
-var bofDefaultHtml=document.getElementById('bof-table-container').innerHTML;
-var bofDefaultHeading=document.getElementById('bof-range-heading')?document.getElementById('bof-range-heading').textContent:'';
 function bofBindStatusFilter(){
   var sel=document.getElementById('performance-status');
   if(!sel)return;
@@ -171,53 +200,27 @@ function bofBindStatusFilter(){
 }
 bofBindStatusFilter();
 (function(){
-  var def=document.getElementById('bof-range-default');
-  var cust=document.getElementById('bof-range-custom');
-  var fields=document.getElementById('bof-range-fields');
-  var apply=document.getElementById('bof-range-apply');
-  var status=document.getElementById('bof-range-status');
+  // The BOF table follows the page's global date filter. The seven-day snapshot is
+  // already server-rendered, so only a different range needs fetching — which keeps
+  // the common case free of a Windsor round trip on page load.
   var container=document.getElementById('bof-table-container');
+  var status=document.getElementById('bof-range-status');
   var heading=document.getElementById('bof-range-heading');
-  if(!def||!cust||!fields||!apply||!container)return;
-  var bofReqId=0;
-  function mode(isCustom){
-    cust.classList.toggle('active',isCustom);
-    def.classList.toggle('active',!isCustom);
-    fields.hidden=!isCustom;
-  }
-  def.onclick=function(){
-    bofReqId++;
-    mode(false);
-    status.textContent='';
-    container.innerHTML=bofDefaultHtml;
-    if(heading)heading.textContent=bofDefaultHeading;
-    bofBindStatusFilter();
-  };
-  cust.onclick=function(){mode(true);};
-  apply.onclick=function(){
-    var from=document.getElementById('bof-range-from').value;
-    var to=document.getElementById('bof-range-to').value;
-    if(!from||!to){status.textContent='Pick both a start and an end date.';return;}
-    status.textContent='Loading…';
-    apply.disabled=true;
-    var reqId=++bofReqId;
-    fetch('/api/bof-range?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to))
-      .then(function(r){return r.json();})
-      .then(function(d){
-        if(reqId!==bofReqId)return;
-        // A failed range must never blank the seven-day view the reviewer relies on.
-        if(!d.ok){status.textContent=d.error;return;}
-        container.innerHTML=d.html;
-        if(heading)heading.textContent='Creative performance · '+d.dateFrom+' to '+d.dateTo;
-        bofBindStatusFilter();
-        status.textContent='';
-      })
-      .catch(function(){
-        if(reqId!==bofReqId)return;
-        status.textContent='Could not load that date range. Please try again shortly.';
-      })
-      .finally(function(){apply.disabled=false;});
-  };
+  if(!container||!RANGE)return;
+  var isDefaultSeven=(!RANGE.isCustom&&RANGE.days===7);
+  if(isDefaultSeven)return;
+  status.textContent='Loading '+RANGE.start+' to '+RANGE.end+'…';
+  fetch('/api/bof-range?from='+encodeURIComponent(RANGE.start)+'&to='+encodeURIComponent(RANGE.end))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      // A failed range must never blank the seven-day view already on screen.
+      if(!d.ok){status.textContent=d.error;return;}
+      container.innerHTML=d.html;
+      bofBindStatusFilter();
+      if(heading)heading.textContent='Creative performance · '+d.dateFrom+' to '+d.dateTo;
+      status.textContent='';
+    })
+    .catch(function(){status.textContent='Could not load that date range for this tab.';});
 })();
 const W=1000,H=300,PL=40,PR=14,PT=14,PB=28,YMAX=6;
 function xy(i,n,v){const x=PL+(W-PL-PR)*(n<=1?0:i/(n-1));const y=PT+(H-PT-PB)*(1-v/YMAX);return[x,y];}

@@ -11,3 +11,6 @@ credentials.json
 key.json
 *.pem
 .superpowers/
+
+.serena/
+test-results.txt

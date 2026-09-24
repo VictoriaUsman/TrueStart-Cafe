@@ -15,6 +15,10 @@ const { buildCohortTable } = require('../lib/transform/cohort');
 const { buildLtvTable } = require('../lib/transform/ltv');
 const { buildDailyAovComparisonSeries } = require('../lib/transform/daily-aov');
 const { buildMonthlyCacSeries } = require('../lib/transform/monthly-cac');
+const { filterCreativeBlocks } = require('../lib/transform/creatives-window');
+const {
+  resolveReportingRange, describeCoverage, latestCommonDay, ReportingRangeError,
+} = require('../lib/reporting-range');
 const { injectDashboard } = require('../lib/template');
 const { renderKpiRow } = require('../lib/render/kpis');
 const { renderGoogleTab } = require('../lib/render/google');
@@ -28,6 +32,18 @@ const { formatMoney, formatMoneyK } = require('../lib/render/format');
 
 function unavailableNote(label) {
   return `<div class="note" style="color:#a02533">${label} data is temporarily unavailable — please refresh shortly.</div>`;
+}
+
+// A source that cannot honestly answer for the selected range says so here. The
+// alternative — rendering the number it *can* produce — is worse than showing
+// nothing, because an unchanged or zeroed figure under a changed date heading
+// reads as a real result.
+function limitationNote(label, reason) {
+  return `<div class="note" style="color:#C98A00"><b>${label} is not filtered by the selected dates.</b> ${reason}</div>`;
+}
+
+function escapeAttr(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 async function settleTab(label, url) {
@@ -76,7 +92,7 @@ function deltaCaption(current, previous, { formatFn, direction }) {
   return { text, cls: improved ? 'up' : undefined, style: improved ? undefined : 'color:#C98A00' };
 }
 
-async function buildDashboardHtml(env) {
+async function buildDashboardHtml(env, query = {}) {
   const [creatives, googleDaily, metaDaily, shopifyDaily, newReturning, cohort, cacMonthly, stock, provenSnapshot] = await Promise.all([
     settleTab('Creatives', env.SHEET_CSV_URL_CREATIVES),
     settleTab('Google Ads', env.SHEET_CSV_URL_GOOGLE_DAILY),
@@ -97,16 +113,74 @@ async function buildDashboardHtml(env) {
     readProvenSnapshot(env).catch((err) => { console.error('[dashboard] Proven snapshot:', err.message); return null; }),
   ]);
 
-  const proven = bofView(provenSnapshot, new Date(), accountTimeZone(env));
+  const timeZone = accountTimeZone(env);
+  const proven = bofView(provenSnapshot, new Date(), timeZone);
 
-  const data = creatives.ok ? buildCreativesData(creatives.rows) : [];
+  // Anchored to the newest day EVERY day-level source has reached, not the newest
+  // any one of them has. Anchoring to a leader would render the laggards' final
+  // days as zeros, which reads as a collapse in performance rather than a sync
+  // that has not caught up.
+  const anchorDate = latestCommonDay([
+    latestDate(shopifyDaily.rows, 'Day'),
+    latestDate(metaDaily.rows, 'Day'),
+    latestDate(googleDaily.rows, 'Day'),
+  ]);
 
-  // Window anchored to the latest day present in the day-level data, not "today" —
-  // the Sheet may lag behind real time.
-  const anchorDate =
-    latestDate(shopifyDaily.rows, 'Day') || latestDate(metaDaily.rows, 'Day') || latestDate(googleDaily.rows, 'Day') || new Date().toISOString().slice(0, 10);
-  const { start, end, prevStart, prevEnd } = windowBounds(anchorDate, 30);
-  const windowNote = `📅 KPI cards above show the <b>last 30 days (${formatShortLabel(start)} – ${formatShortLabel(end)})</b> vs the previous 30 days (${formatShortLabel(prevStart)} – ${formatShortLabel(prevEnd)}). Each tab below shows its own window — labelled in the heading.`;
+  const range = resolveReportingRange(query, { timeZone, latestAvailable: anchorDate });
+  const { start, end, prevStart, prevEnd, days, isCustom, preset } = range;
+
+  const periodLabel = `${formatShortLabel(start)} – ${formatShortLabel(end)}`;
+  const comparisonLabel = `${formatShortLabel(prevStart)} – ${formatShortLabel(prevEnd)}`;
+  const periodName = isCustom ? `${days} days` : `last ${days} days`;
+  const cardPeriod = isCustom ? periodLabel : `last ${days}d`;
+
+  const windowNote = `📅 Showing <b>${periodName} (${periodLabel})</b> vs the preceding ${days} days (${comparisonLabel}). Every date-based report below uses this range; sources that cannot honour it say so in place of a number.`;
+
+  // Each source is checked on its own. A range extending past what a source has
+  // synced must not be summed as if the missing days were zeros.
+  const coverage = (rows) => describeCoverage(rows, { dateKey: 'Day', start, end, toIsoDate });
+  const shopifyCoverage = coverage(shopifyDaily.rows);
+  const metaCoverage = coverage(metaDaily.rows);
+  const googleCoverage = coverage(googleDaily.rows);
+
+  const shortfall = (label, c) => {
+    if (c.empty) return `${label} has no dated rows at all.`;
+    if (c.missingBefore && c.missingAfter) return `${label} only covers ${c.first} to ${c.last}.`;
+    if (c.missingBefore) return `${label} history starts ${c.first}, after the selected start.`;
+    if (c.missingAfter) return `${label} is only synced to ${c.last}.`;
+    return null;
+  };
+  const coverageWarnings = [
+    shortfall('Shopify sales', shopifyCoverage),
+    shortfall('Meta', metaCoverage),
+    shortfall('Google Ads', googleCoverage),
+  ].filter(Boolean);
+  const coverageNote = coverageWarnings.length
+    ? `<div class="note" style="color:#C98A00"><b>Partial coverage for this range.</b> ${coverageWarnings.join(' ')} Totals below cover only the days each source actually holds.</div>`
+    : '';
+
+  // Creative rows are five-day blocks, so only whole blocks inside the range are
+  // aggregated — never a partial block, and never prorated (see creatives-window.js).
+  const creativeWindow = creatives.ok
+    ? filterCreativeBlocks(creatives.rows, { start, end, toIsoDate })
+    : { dated: false, rows: [], coveredStart: null, coveredEnd: null, excluded: 0, exact: false };
+  const data = !creatives.ok ? [] : creativeWindow.dated ? buildCreativesData(creativeWindow.rows) : buildCreativesData(creatives.rows);
+
+  // When the sheet carries no usable block columns the data is still shown, but
+  // labelled as unfiltered. Blanking four tabs on a header-spelling mismatch would
+  // be worse: a dashboard that goes dark gets worked around, whereas a number
+  // carrying an explicit "not filtered" banner gets read correctly.
+  const creativesUsable = creatives.ok && (!creativeWindow.dated || creativeWindow.rows.length > 0);
+  const creativeNote = !creatives.ok
+    ? null
+    : !creativeWindow.dated
+      ? 'The Creatives sheet has no reporting-date columns, so these figures cover all synced history, NOT the selected dates.'
+      : creativeWindow.rows.length === 0
+        ? `No complete five-day creative block falls inside ${periodLabel}. Creative data is stored in five-day blocks, so a range shorter than one block cannot be reported.`
+        : !creativeWindow.exact
+          ? `Creative data is stored in five-day blocks. This covers ${formatShortLabel(creativeWindow.coveredStart)} – ${formatShortLabel(creativeWindow.coveredEnd)}; ${creativeWindow.excluded} block(s) crossing the edge of the selection were excluded rather than counted whole or prorated.`
+          : null;
+  const creativeCaveat = creativeNote ? limitationNote('Creative data', creativeNote) : '';
 
   const shopifySales = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Total sales', start, end });
   const prevShopifySales = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Total sales', start: prevStart, end: prevEnd });
@@ -131,7 +205,7 @@ async function buildDashboardHtml(env) {
   // The new-vs-returning source is synced over a 90-day trailing window (sync-shopify.js's
   // WINDOW_DAYS) — CAC's spend must be summed over that same window, not the 30-day KPI window,
   // or the ratio's two halves refer to different periods (30d spend ÷ 90d customers).
-  const cacWindow = windowBounds(anchorDate, 90);
+  const cacWindow = windowBounds(end, 90);
   const cacMetaSpend = sumInWindow(metaDaily.rows, { dateKey: 'Day', valueKey: 'Amount spent (GBP)', start: cacWindow.start, end: cacWindow.end });
   const cacGoogleSpend = sumInWindow(googleDaily.rows, { dateKey: 'Day', valueKey: 'Cost', start: cacWindow.start, end: cacWindow.end });
   const cacValue = cac({ metaSpend: cacMetaSpend, googleSpend: cacGoogleSpend, newCustomers: newReturningTotals.newCustomers });
@@ -144,23 +218,24 @@ async function buildDashboardHtml(env) {
   // CAC additionally needs the new-vs-returning source for its denominator.
   const cacOk = metaDaily.ok && googleDaily.ok && newReturning.ok;
   const kpiRowNeeded = dayLevelOk || cacOk || creatives.ok;
+  const P = cardPeriod;
 
   const kpiTop = kpiRowNeeded
     ? renderKpiRow([
         dayLevelOk
-          ? { icon: '◐ BLENDED · last 30d', big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) }
-          : { icon: '◐ BLENDED · last 30d', big: '—', cap: 'ROAS / MER — data unavailable' },
+          ? { icon: `◐ BLENDED · ${P}`, big: mer.toFixed(2), cap: 'ROAS / MER (Shopify ÷ Meta+Google)', chg: deltaCaption(mer, prevMer, { formatFn: (v) => v.toFixed(2), direction: 'higher' }) }
+          : { icon: `◐ BLENDED · ${P}`, big: '—', cap: 'ROAS / MER — data unavailable' },
         dayLevelOk
-          ? { icon: 'ⓕ META · last 30d', big: formatMoneyK(metaSpend), cap: 'Spend', chg: deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
-          : { icon: 'ⓕ META · last 30d', big: '—', cap: 'Spend — data unavailable' },
+          ? { icon: `ⓕ META · ${P}`, big: formatMoneyK(metaSpend), cap: 'Spend', chg: deltaCaption(metaSpend, prevMetaSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
+          : { icon: `ⓕ META · ${P}`, big: '—', cap: 'Spend — data unavailable' },
         dayLevelOk
-          ? { icon: 'Ⓖ GOOGLE · last 30d', big: formatMoneyK(googleSpend), cap: 'Cost', chg: deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
-          : { icon: 'Ⓖ GOOGLE · last 30d', big: '—', cap: 'Cost — data unavailable' },
+          ? { icon: `Ⓖ GOOGLE · ${P}`, big: formatMoneyK(googleSpend), cap: 'Cost', chg: deltaCaption(googleSpend, prevGoogleSpend, { formatFn: formatMoneyK, direction: 'neutral' }) }
+          : { icon: `Ⓖ GOOGLE · ${P}`, big: '—', cap: 'Cost — data unavailable' },
         dayLevelOk
-          ? { icon: '🛍 SHOPIFY · last 30d', big: formatMoneyK(shopifySales), cap: 'Total sales', chg: deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) }
-          : { icon: '🛍 SHOPIFY · last 30d', big: '—', cap: 'Total sales — data unavailable' },
+          ? { icon: `🛍 SHOPIFY · ${P}`, big: formatMoneyK(shopifySales), cap: 'Total sales', chg: deltaCaption(shopifySales, prevShopifySales, { formatFn: formatMoneyK, direction: 'higher' }) }
+          : { icon: `🛍 SHOPIFY · ${P}`, big: '—', cap: 'Total sales — data unavailable' },
         cacOk
-          ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · Meta+Google ÷ new customers (last 90d)' }
+          ? { icon: '💷 CAC · cost per new customer', big: formatMoney(cacValue), cap: 'blended · fixed 90-day window — not the selected range' }
           : { icon: '💷 CAC · cost per new customer', big: '—', cap: 'blended · Meta+Google ÷ new customers — data unavailable' },
         proven.counts !== null
           ? {
@@ -179,26 +254,38 @@ async function buildDashboardHtml(env) {
     ? renderMetaTab({ spend: metaSpend, purchases: metaKpi, convValue: metaConvValue, roas: metaSpend > 0 ? metaConvValue / metaSpend : 0 })
     : unavailableNote('Meta');
 
-  const overviewTab = creatives.ok ? renderOverviewTab({ funnel: buildFunnelSplit(data), statusSpend: buildStatusSpend(data) }) : unavailableNote('Creative overview');
+  const overviewTab = !creatives.ok
+    ? unavailableNote('Creative overview')
+    : creativesUsable
+      ? creativeCaveat + renderOverviewTab({ funnel: buildFunnelSplit(data), statusSpend: buildStatusSpend(data) })
+      : creativeCaveat;
 
-  const insightsTab = creatives.ok
-    ? renderTwoColumn(
+  const insightsTab = !creatives.ok
+    ? unavailableNote('Angle & persona')
+    : !creativesUsable
+    ? creativeCaveat
+    : creativeCaveat + renderTwoColumn(
         renderBreakdownCard({ title: 'By angle', labelHeader: 'Angle', rows: buildBreakdown(data, (a) => a.angle), cpaDecimals: 0 }),
         renderBreakdownCard({ title: 'By persona', labelHeader: 'Persona', rows: buildBreakdown(data, (a) => a.persona), cpaDecimals: 0 })
-      )
-    : unavailableNote('Angle & persona');
+      );
 
-  const packprodTab = creatives.ok
-    ? renderTwoColumn(
+  const packprodTab = !creatives.ok
+    ? unavailableNote('Pack & product')
+    : !creativesUsable
+    ? creativeCaveat
+    : creativeCaveat + renderTwoColumn(
         renderBreakdownCard({ title: 'By pack type', labelHeader: 'Pack', rows: buildBreakdown(data, (a) => a.product), cpaDecimals: 2, boldRows: true }),
         renderBreakdownCard({ title: 'By product (pack × format)', labelHeader: 'Product', rows: buildBreakdown(data, (a) => `${a.product} · ${a.format}`), cpaDecimals: 2 })
-      )
-    : unavailableNote('Pack & product');
+      );
 
   // Computed once and reused by both the Cohort tab and the Subscription tab's Cumulative LTV
   // estimate (retention rate × AOV), so the two sections can never disagree on cohort shape.
   const cohortTableData = cohort.ok ? buildCohortTable(cohort.rows) : [];
-  const cohortTable = cohort.ok ? renderCohortTable(cohortTableData) : unavailableNote('Cohort');
+  const cohortNote = limitationNote(
+    'Cohort & LTV',
+    `Cohorts are monthly acquisition groups, so they cannot be cut to ${periodLabel}. Months overlapping the selection are shown, and each row follows that cohort for its full lifetime to date — not only the selected days.`
+  );
+  const cohortTable = cohort.ok ? cohortNote + renderCohortTable(cohortTableData) : unavailableNote('Cohort');
 
   const aov = sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Net sales', start, end }) /
     (sumInWindow(shopifyDaily.rows, { dateKey: 'Day', valueKey: 'Orders', start, end }) || 1);
@@ -208,58 +295,104 @@ async function buildDashboardHtml(env) {
   });
 
   const subscriptionTab = shopifyDaily.ok && newReturning.ok
-    ? renderSubscriptionTab({
+    ? limitationNote(
+        'New vs returning customers',
+        'The source sheet holds undated 90-day totals, so these counts cannot be cut to the selected dates. Average order value and the chart above do follow the selection.'
+      ) + renderSubscriptionTab({
         aov,
         newCustomers: newReturningTotals.newCustomers,
         returningCustomers: newReturningTotals.returningCustomers,
         ltvRows: cohort.ok ? buildLtvTable(cohortTableData, aov) : [],
         aovCurrent, aovPrevious, aovLabels,
+        periodLabel, comparisonLabel, customerPeriodLabel: 'last 90d',
       })
     : unavailableNote('Subscription & LTV');
 
-  const { RS, LB } = buildDailyRoasSeries({ shopifyDailyRows: shopifyDaily.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows });
+  const { RS, LB } = buildDailyRoasSeries({ shopifyDailyRows: shopifyDaily.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows, start, end });
 
   // The month containing the anchor date is still in progress (synced daily, not a full calendar
   // month yet) — included but flagged so renderCacChart can mark its bar as partial/to-date.
-  const anchorMonth = anchorDate.slice(0, 7);
+  const anchorMonth = end.slice(0, 7);
+  const cacTrendNote = limitationNote(
+    'Monthly CAC trend',
+    'New-customer counts are stored per calendar month, so this trend cannot be cut to a partial month. It always shows whole months.'
+  );
   const cacChart = metaDaily.ok && googleDaily.ok && cacMonthly.ok
-    ? renderCacChart(buildMonthlyCacSeries({
+    ? cacTrendNote + renderCacChart(buildMonthlyCacSeries({
         monthlyRows: cacMonthly.rows, metaDailyRows: metaDaily.rows, googleDailyRows: googleDaily.rows, currentMonth: anchorMonth,
       }))
     : unavailableNote('Monthly CAC trend');
 
+  // Presets are plain links and the custom picker is a GET form, so every range is
+  // a shareable URL that survives a reload.
+  const presetLink = (label, d) => {
+    const active = !isCustom && preset === d ? ' active' : '';
+    return `<a class="db${active}" href="?days=${d}">${label}</a>`;
+  };
+  const rangeControls = `<div class="rangebar">
+    ${presetLink('Last 7 days', 7)}${presetLink('Last 30 days', 30)}${presetLink('Last 90 days', 90)}
+    <form id="range-form" method="get" action="/">
+      <input type="hidden" id="range-tab" name="" value="">
+      <label for="range-from">From</label>
+      <input type="date" id="range-from" name="from" value="${escapeAttr(start)}" max="${escapeAttr(range.anchor)}" required>
+      <label for="range-to">To</label>
+      <input type="date" id="range-to" name="to" value="${escapeAttr(end)}" max="${escapeAttr(range.anchor)}" required>
+      <button type="submit" class="db${isCustom ? ' active' : ''}">Apply</button>
+    </form>
+  </div>`;
+
   const html = injectDashboard(
     {
-      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart, windowNote, provenTab: proven.html,
+      kpiTop, googleTab, metaTab, overviewTab, insightsTab, packprodTab, cohortTable, subscriptionTab, cacChart, provenTab: proven.html,
+      rangeControls, periodLabel, comparisonLabel, periodName,
+      windowNote: coverageNote + windowNote,
       // Plain text (not unavailableNote's <div>) because this is injected inside an inline <span> in
       // the template; phrasing still matches "{label} data is temporarily unavailable" for consistency
       // with the other sections' degraded-state copy.
       stockStatus: stock.ok ? `live · fetched ${new Date(stock.snap.asOf).toLocaleString('en-GB')}` : 'Stock data is temporarily unavailable — please refresh shortly.',
     },
-    { DATA: data, RS, LB, STK_SNAP: stock.snap }
+    { DATA: data, RS, LB, STK_SNAP: stock.snap, RANGE: { start, end, days, isCustom } }
   );
 
-  // The original static snapshot also hardcodes this same 30-day window's date range directly
-  // into several section headings and the page subtitle (outside any injected fragment) — e.g.
-  // "Google Ads performance — by campaign · last 30d (Jul 20 – Aug 18)". Rather than adding a
-  // marker at each of those spots, replace every literal occurrence of the two snapshot date
-  // ranges with today's real equivalents in one pass.
-  const currentWindowLabel = `${formatShortLabel(start)} – ${formatShortLabel(end)}`;
-  const prevWindowLabel = `${formatShortLabel(prevStart)} – ${formatShortLabel(prevEnd)}`;
-  return html
-    .split('Jul 20 – Aug 18').join(currentWindowLabel)
-    .split('Jun 20 – Jul 19').join(prevWindowLabel);
+  return html;
 }
 
 module.exports = { buildDashboardHtml };
 
 module.exports.default = async function handler(req, res) {
+  const url = new URL(req.url, 'http://localhost');
+  const query = {
+    from: url.searchParams.get('from'),
+    to: url.searchParams.get('to'),
+    days: url.searchParams.get('days'),
+  };
   try {
-    const html = await buildDashboardHtml(process.env);
+    // Shape-check the range before fetching anything. Without this a malformed
+    // URL costs eight Sheet fetches and a Shopify call before being refused.
+    // buildDashboardHtml re-resolves against the real data anchor afterwards.
+    resolveReportingRange(query, { timeZone: accountTimeZone(process.env) });
+    const html = await buildDashboardHtml(process.env, {
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      days: url.searchParams.get('days'),
+    });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    // The page now varies by query string, so the shared cache must key on it.
+    res.setHeader('Vary', 'Accept-Encoding');
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     res.status(200).send(html);
   } catch (err) {
+    if (err instanceof ReportingRangeError || err.status === 400) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(400).send(
+        `<!doctype html><meta charset="utf-8"><title>Invalid date range</title>` +
+        `<div style="font:15px/1.5 system-ui,sans-serif;max-width:40em;margin:3em auto;padding:0 1em">` +
+        `<h1 style="font-size:19px">That date range can't be shown</h1>` +
+        `<p>${escapeAttr(err.message)}</p><p><a href="/">Back to the last 30 days</a></p></div>`
+      );
+      return;
+    }
     console.error('[dashboard] fatal error building page:', err);
     res.status(500).send('Dashboard temporarily unavailable. Please try again shortly.');
   }
